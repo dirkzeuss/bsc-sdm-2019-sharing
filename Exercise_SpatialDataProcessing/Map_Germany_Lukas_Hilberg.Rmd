@@ -1,0 +1,51 @@
+---
+title: "Map_Germany"
+author: "Lukas Hilberg"
+date: "13 11 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{map_germany}
+library(raster)
+
+elevation <- getData('alt', country='DE', mask=TRUE)
+plot(elevation)
+border <- getData('GADM', country='DE', level=0)
+border
+
+plot(border)
+cropped_Border_Elevation_GER <- crop(elevation, extent(border))
+plot(cropped_Border_Elevation_GER)
+plot(border, add= T)
+
+Frankenberg (Eder) <- points(8.796667, 51.058889,  pch=8, cex=2) # Frankenberg (Eder)
+Kassel <- points(9.4797461, 51.3127114,  pch=8, cex=2) # Kassel
+Berlin <- points(13.4132151, 52.521918,  pch=8, cex=2) # Berlin
+Olpe <- points(7.8502943, 51.0282107,  pch=8, cex=2) # Olpe
+Frankfurt <- points(8.6821267, 50.1109221,  pch=8, cex=2) # Frankfurt
+Happurg <- points(11.4719457, 49.4937364,  pch=8, cex=2) # Happurg
+Bad_Hersfeld <- points(9.7019675, 50.8701345,  pch=8, cex=2) # Bad Hersfeld
+Berlin <-points(13.4132151, 52.521918,  pch=5, cex=1) # Berlin largest
+Hamburg <-points(9.993682, 53.551085,  pch=5, cex=1) # Hamburg second largest
+München <-points(11.581981, 48.135125,  pch=5, cex=1) # München third largest
+
+legend("topleft", inset=.02, title="hometowns",
+       c("Frankenberg (Eder)","Kassel","Berlin", "Olpe", "Frankfurt", "Happurg", "Bad Hersfeld"), 
+       horiz=FALSE,  pch=8, cex=1)
+
+legend("bottomleft", inset=.02, title="large cities",
+       c("Berlin", "Hamburg", "München" ), 
+       horiz=FALSE,  pch=5, cex=1)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
