@@ -1,0 +1,81 @@
+---
+title: "Übungsaufgabe_3"
+author: "Kluga"
+date: "12 11 2019"
+output: html_document
+---
+
+
+Spatial Data Progressing 
+```{r}
+
+library(raster)
+
+
+#Create a map of Germany with the following features:
+
+# - a raster background map showing elevation data
+
+ele <- getData("alt", country = "DE", res=10)
+#ele
+
+plot(ele, xlab = "°East", ylab = "°North", main = "ELEVATION OF GERMANY IN METER")
+
+# - a vector map showing the country boundary
+
+de <- getData('GADM', country='DE', level=0)
+de
+
+plot(de, add = T)
+
+# - use the vector map to clip the raster map
+
+## already done in step 1 (with the "country = 'DE' " )
+
+# - map point locations denoting the places of birth of all course participants (use a SpatialPointsDataFrame object with the correct CRS for this task),
+
+
+x <- c(7.46529, 9.70196, 7.85029, 9.57223, 9.47974, 8.79666, 13.41321, 8.61212, 11.47152)
+y <- c(51.51358, 50.87013, 51.02821, 49.98922, 51.31271, 51.05888, 52.52191, 50.11092, 49.49277)
+z <- c("Dortmund", "Bad Hersfeld", "Olpe", "Lohr", "Kassel", "Frankenberg", "Berlin", "Frankfurt", "Happurg")
+df <- data.frame(z)
+
+df_birth <- data.frame(x, y, row.names = z)
+df_birth
+
+birthplaces <- SpatialPointsDataFrame(df_birth, df)
+plot(birthplaces, pch = 18, add = T)
+
+# - map the three largest German cities and Marburg with different symbols, and get bonus points by adding a legend,      rivers, and other cartographic elements as well as the distances of the places of birth to Marburg.
+
+x_cities <- c(13.404954, 9.99368, 11.57538, 8.76679)
+y_cities <- c(52.52000, 53.55108, 48.13710, 50.80217)
+z_cities <- c("Berlin", "Hamburg", "München", "Marburg")
+
+df_cities <- data.frame(x_cities, y_cities, row.names = z_cities)
+df_cities
+df_c <- data.frame(z_cities)
+
+cities <- SpatialPointsDataFrame(df_cities, df_c)
+plot(cities, pch = 8, cex = 2, add = T)
+plot(cities[4, ], col = "red", pch = 8, cex =2, add = T)
+
+## legend 
+
+legend(0.5, 49.5, legend = c("Biggest Cities", "Marburg", "Birthplaces"), col = c("black", "red", "black"), pch = c(8, 8, 18), pt.cex = c(2, 2, 1))
+
+## for the other entries i had a problem in finding a way to link a R-Donwload in the script. I found a way to make it with manual downloads, but doing so my file is bigger then 2mb.
+
+#save as .jpeg
+jpeg("ElevationGermany.jpg")
+plot(ele, xlab = "°East", ylab = "°North", main = "ELEVATION OF GERMANY IN METER")
+plot(de, add = T)
+plot(birthplaces, pch = 18, add = T)
+plot(cities, pch = 8, cex = 2, add = T)
+plot(cities[4, ], col = "red", pch = 8, cex =2, add = T)
+legend(0.5, 49.5, legend = c("Biggest Cities", "Marburg", "Birthplaces"), col = c("black", "red", "black"), pch = c(8, 8, 18), pt.cex = c(2, 2, 1))
+dev.off()
+```
+
+
+
