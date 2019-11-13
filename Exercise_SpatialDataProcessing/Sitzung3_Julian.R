@@ -5,22 +5,22 @@ r["CRAN"] <- "https://ftp.gwdg.de/pub/misc/cran/"
 options(repos=r)
 })
 
-install.packages("sp")
+#install.packages("sp")
 library(sp)
-install.packages("raster")
+#install.packages("raster")
 library(raster)
-install.packages("rgdal")
+#install.packages("rgdal")
 library(rgdal)
 
-install.packages("maps")
-install.packages("maptools")
+#install.packages("maps")
+#install.packages("maptools")
 library(maps)
 library(maptools)
 
-prec <- getData("worldclim", var="prec", res=10)
+prec <- getData("worldclim", var="prec", res=10, path="../data")
 prec
 
-plot(prec$prec1) #Auswählen, welcher Layer geplottet werden soll mit $
+plot(prec$prec1) #Ausw?hlen, welcher Layer geplottet werden soll mit $
 
 #Frankreich mit Grenze
 fra <- getData('GADM', country='FRA', level=0)
@@ -86,7 +86,7 @@ plot(SPDF_1, pch = 19, add=T)
 
 plot(river, lwd=1, add=T)
 
-München <- points(11.581981, 48.135125, pch=22, col="red")
+M?nchen <- points(11.581981, 48.135125, pch=22, col="red")
 Hamburg <- points(9.993682, 53.551085, pch=22, col="red")
 Berlin <- points(13.413215, 52.521918, pch=22, col="red")
 Marburg <- points(8.7667933, 50.8021728, pch=21, col="red")
