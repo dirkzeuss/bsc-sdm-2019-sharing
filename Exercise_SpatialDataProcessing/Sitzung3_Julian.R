@@ -1,9 +1,12 @@
-chooseCRANmirror(30)
-options("repos")
-local({r <- getOption("repos")
-r["CRAN"] <- "https://ftp.gwdg.de/pub/misc/cran/"
-options(repos=r)
-})
+# chooseCRANmirror(30)
+# options("repos")
+# local({r <- getOption("repos")
+# r["CRAN"] <- "https://ftp.gwdg.de/pub/misc/cran/"
+# options(repos=r)
+# })
+
+
+## Intro ####
 
 #install.packages("sp")
 library(sp)
@@ -23,7 +26,7 @@ prec
 plot(prec$prec1) #Ausw?hlen, welcher Layer geplottet werden soll mit $
 
 #Frankreich mit Grenze
-fra <- getData('GADM', country='FRA', level=0)
+fra <- getData('GADM', country='FRA', level=0, path="../data")
 fra  
 
 plot(fra)
@@ -49,22 +52,20 @@ plot(fra, add=T)
 points(2.349014, 48.864716, pch=8, cex=2) # roughly the location of Paris
 
 #SPeichern der Datei im Homeverzeichnis
-jpeg("FirstSimpleMap.jpg")
+#jpeg("FirstSimpleMap.jpg")
 plot(clipped_prec_sum)
 plot(fra, add=T)
 points(2.349014, 48.864716, pch=8, cex=2)
-dev.off()
+#dev.off()
 
-#Aufgaben
-prec <- getData("worldclim", var="prec", res=10)
-de <- getData('GADM', country='DE', level=0)
+## Aufgaben ####
+prec <- getData("worldclim", var="prec", res=10, path="../data")
+de <- getData('GADM', country='DE', level=0, path="../data")
 
+DE_alt <- getData("alt", country="DE", res=10, path="../data")
 plot(DE_alt)
 plot(de, add=T) #Plottet Grenze
 
-DE_alt <- getData("alt",country="DE", res=10)
-plot(DE_alt)
-DE_alt
 
 
 x <- c(7.4652981, 9.7019675, 7.8502943, 9.5722309, 9.4797461, 8.796667, 13.413215, 8.6821267, 11.4719457)
@@ -76,17 +77,17 @@ SPDF <- SpatialPointsDataFrame(xy, attributes)
 proj4string(SPDF) <- crs("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
 SPDF_1 <- spTransform(SPDF, CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
 
-natural <- readOGR("natural.shp")
+#natural <- readOGR("natural.shp")
 
-levels(natural@data$type)
-river <- river[river$type == "riverbank",]
+#levels(natural@data$type)
+#river <- river[river$type == "riverbank",]
 
 plot(DE_alt, main="Largest rivers in Germany")
 plot(SPDF_1, pch = 19, add=T)
 
-plot(river, lwd=1, add=T)
+#plot(river, lwd=1, add=T)
 
-M?nchen <- points(11.581981, 48.135125, pch=22, col="red")
+Muenchen <- points(11.581981, 48.135125, pch=22, col="red")
 Hamburg <- points(9.993682, 53.551085, pch=22, col="red")
 Berlin <- points(13.413215, 52.521918, pch=22, col="red")
 Marburg <- points(8.7667933, 50.8021728, pch=21, col="red")
