@@ -1,0 +1,40 @@
+---
+title: "DE_Elevation"
+author: "William James Gabriel"
+date: "13 11 2019"
+output: html_document
+---
+
+
+
+```{r}
+# Map Germany 
+
+getData()
+
+elevation <- getData('alt', country='DE', mask=TRUE)
+plot(elevation)
+
+boundary <- getData('GADM', country='DE', level=0)
+plot(boundary, add=T)
+
+cropped_DE_boundaries <- crop(elevation, extent(boundary))
+plot(cropped_DE_boundaries)
+plot(boundary, add=T)
+
+
+points(8.766, 50.802, pch=20, cex=2) # Marburg
+
+points(9.479, 51.312, pch=8, cex=2) # Kassel
+points(8.802, 51.058, pch=8, cex=2) # Frankenberg
+points(7.846, 51.028, pch=8, cex=2) # Olpe
+points(8.683, 50.112, pch=8, cex=2) # Frankfurt 
+points(9.712, 50.869, pch=8, cex=2) # Bad Hersfeld
+points(11.469, 49.493, pch=8, cex=2) # Happurg
+
+
+points(9.992, 53.553, pch=20, cex= 2) # Hamburg
+points(11.577, 48.136, pch=20, cex=2) # M??nchen
+points(13.402, 52.501, pch=8, cex=2) # Berlin
+
+```
