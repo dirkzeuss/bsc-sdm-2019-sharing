@@ -1,0 +1,150 @@
+---
+title: "glm2"
+author: "Volker Dickhardt"
+date: "14 November 2019"
+output: html_document
+---
+####Laden der Dateien
+```{r}
+library(dismo)
+files <- list.files(path=paste(system.file(package="dismo"),'/ex', sep=''), pattern='grd', full.names=TRUE )
+```
+
+```{r}
+predictors <- stack(files)
+file <- paste(system.file(package="dismo"), "/ex/bradypus.csv", sep="")
+```
+
+```{r}
+bradypus <- read.table(file,  header=TRUE,  sep=',')
+bradypus  <- bradypus[,-1]
+```
+
+```{r}
+presvals <- extract(predictors, bradypus)
+
+```
+
+```{r}
+set.seed(0)
+backgr <- randomPoints(predictors, 500)
+absvals <- extract(predictors, backgr)
+pb <- c(rep(1, nrow(presvals)), rep(0, nrow(absvals)))
+sdmdata <- data.frame(cbind(pb, rbind(presvals, absvals)))
+sdmdata[,'biome'] = as.factor(sdmdata[,'biome'])
+```
+
+
+```{r}
+pred_nf <- dropLayer(predictors,'biome')
+```
+
+```{r}
+group <- kfold(bradypus, 5)
+pres_train <- bradypus[group != 1, ]
+pres_test <- bradypus[group == 1, ]
+ext = extent(-90, -32, -33, 23)
+
+```
+
+```{r}
+backg <- randomPoints(pred_nf, n=1000, ext=ext, extf = 1.25)
+colnames(backg) = c('lon','lat')
+group <- kfold(backg, 5)
+backg_train <- backg[group != 1, ]
+backg_test <- backg[group == 1, ]
+r = raster(pred_nf, 1)
+plot(!is.na(r), col=c('white','light grey'), legend=FALSE)> plot(ext, add=TRUE, col='red', lwd=2)
+points(backg_train, pch='-', cex=0.5, col='yellow')
+points(backg_test, pch='-',  cex=0.5, col='black')
+points(pres_train, pch='+', col='green')
+points(pres_test, pch='+', col='blue')
+```
+####Linear Regression models
+
+mit rbind wird eine Matrix zeilenweise erstellt
+```{r}
+train <- rbind(pres_train, backg_train)
+train
+```
+
+```{r}
+pb_train <- c(rep(1, nrow(pres_train)), rep(0, nrow(backg_train)))
+envtrain <- extract(predictors, train)
+envtrain <- data.frame( cbind(pa=pb_train, envtrain) )
+envtrain[,'biome'] = factor(envtrain[,'biome'], levels=1:14)
+head(envtrain)
+
+```
+
+```{r}
+testpres <- data.frame( extract(predictors, pres_test) )
+testbackg <- data.frame( extract(predictors, backg_test) )
+testpres[ ,'biome'] = factor(testpres[ ,'biome'], levels=1:14)
+testbackg[ ,'biome'] = factor(testbackg[ ,'biome'], levels=1:14)
+```
+
+
+```{r}
+gm1 <- glm(pa ~ bio1 + bio5 + bio6 + bio7 + bio8 + bio12 + bio16 + bio17,family = binomial(link = "logit"), data=envtrain)
+summary(gm1)
+```
+
+```{r}
+coef(gm1)
+```
+
+```{r}
+gm2 <- glm(pa ~ bio1+bio5 + bio6 + bio7 + bio8 + bio12 + bio16 + bio17,family = gaussian(link = "identity"), data=envtrain)
+evaluate(testpres, testbackg, gm1)
+```
+
+```{r}
+ge2 <- evaluate(testpres, testbackg, gm2)
+ge2
+```
+
+```{r}
+pg <- predict(predictors, gm2, ext=ext)
+par(mfrow=c(1,2))
+plot(pg, main='GLM/gaussian, raw values')
+plot(wrld_simpl, add=TRUE, border='dark grey')
+tr <- threshold(ge2,'spec_sens')
+plot(pg > tr, main='presence/absence')
+plot(wrld_simpl, add=TRUE, border='dark grey')
+points(pres_train, pch='+')
+points(backg_train, pch='-', cex=0.25)
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```

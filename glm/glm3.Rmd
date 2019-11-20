@@ -1,0 +1,66 @@
+---
+title: "sdm_glm"
+author: "Volker Dickhardt"
+date: "19 November 2019"
+output: html_document
+---
+
+```{r}
+
+library(SSDM)
+```
+
+
+```{r}
+Env <- load_var(system.file('extdata',  package = 'SSDM'), categorical = 'SUBSTRATE', verbose = FALSE)
+Env
+
+```
+
+
+```{r}
+Occ <- load_occ(path = system.file('extdata',  package = 'SSDM'), Env,
+         Xcol = 'LONGITUDE', Ycol = 'LATITUDE',
+         file = 'Occurrences.csv', sep = ',', verbose = FALSE)
+head(Occ)
+
+```
+
+
+```{r}
+SDM <- modelling('GLM', subset(Occurrences, Occurrences$SPECIES == 'elliptica'), 
+                 Env, Xcol = 'LONGITUDE', Ycol = 'LATITUDE', verbose = FALSE)
+plot(SDM@projection, main = 'SDM for Cryptocarya elliptica with GLM algorithm')
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+

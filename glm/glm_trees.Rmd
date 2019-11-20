@@ -1,0 +1,53 @@
+---
+title: "glm_trees"
+author: "Volker Dickhardt"
+date: "17 November 2019"
+output: html_document
+---
+####Daten Kirschbaum laden
+#las: dreht die Achsenbeschliftung, cex.lab: Größe der Achsenbeschriftung, pch: Sympol, cex: Symbolgröße
+```{r}
+data(trees)
+?trees
+par(mar=c(4,5,1,1))
+plot(Volume ~ Girth, data=trees, las=1, cex.lab=1.5, pch=16, cex=1.5)
+```
+# Zusammenhang evtl. linear
+#family=gaussian: Normalverteilung
+```{r}
+?glm
+fm <- glm(Volume ~ Girth, data=trees, family=gaussian(link = "identity"))
+summary(fm)
+```
+# Geradengleichung für fm: y = 5,0659x - 36,9435
+# estimate" sind die Schätzer und  unter"Intercept" ist der Schätzer für den Achsenabschnitt der Graden angegeben und  unter "Girth" (Baumumfang) die Steigung
+# hochsignifikanter Zusammenhang
+#"Dispersion parameter" ist geschätzter Wert für die Varianz (der GG) der Normalverteilung
+
+# mit seq wird der minimale und der Maximale wert
+#mit der predict-Funktion werden für die neuen Werte Modellvorhersagen berechnet, predict wird auf das GLM (hier im Beispiel fm) angewendet
+#mit newdata=data.frame 
+```{r}
+Girthneu <- seq(min(trees$Girth), max(trees$Girth), len=101)
+preds <- predict(fm, newdata=data.frame("Girth"=Girthneu))
+#für die neuen Werte wird eine Vorhersage mit dem GLM berechnet
+plot(Volume ~ Girth, data=trees, las=1, cex.lab=1.5, pch=16, cex=1.5)
+# lines(x,y, Linienstärke, Linienfarbe) -> zeichnen der Linie
+lines(Girthneu, preds, lwd=2, col="grey")
+```
+#Standardfehler der Schätzer
+```{r}
+preds2 <- predict(fm, newdata=data.frame("Girth"=Girthneu), se.fit=T)
+str(preds2)
+```
+
+```{r}
+plot(Volume ~ Girth, data=trees, las=1, cex.lab=1.5, pch=16, cex=1.5)
+lines(Girthneu, preds, lwd=2, col="grey")
+lines(Girthneu, preds2$fit +2*preds2$se.fit, lwd=2, lty=2, col="grey")
+lines(Girthneu, preds2$fit -2*preds2$se.fit, lwd=2, lty=2, col="grey")
+```
+#innerhalb dieser beiden Grenzen liegt mit 95% Wahrscheinlichkeit die wahre Regressionsgerade
+
+
+#Quelle: Dormann, C. (2017): Parametrische Statistik. Verteilungen, maximum likelihood und GLM in R. 2. Auflage. Berlin.
