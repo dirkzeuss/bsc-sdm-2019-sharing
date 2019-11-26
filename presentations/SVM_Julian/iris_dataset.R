@@ -4,6 +4,7 @@
 install.packages("datasets")
 library(datasets)
 library(e1071)
+library(ggplot2)
 
 data(iris) #drei verschiedene Pflanzenarten
 str(iris) 

@@ -15,7 +15,7 @@ w #integer(0) = beinhaltet kein NA mehr
 lynx <- lynx[-w,] #Zeilen mit NA werden gelöscht
 w <- which(is.na(lynx$lat)) #ueberprueft die lat-Spalte, ob NA beinhaltet
 
-lynx$species <- 1 #fügt eine neue Spalte mit species hinzu
+lynx$species <- 1 #fuegt eine neue Spalte mit species hinzu
 sp <- sp[,c('lon', 'lat', 'species')] #Beschriftung der Spalten
 head(lynx)
 

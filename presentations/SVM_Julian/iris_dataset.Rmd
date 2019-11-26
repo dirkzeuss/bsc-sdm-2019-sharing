@@ -23,7 +23,7 @@ embed_url("https://www.youtube.com/watch?v=Y6RRHw9uN9o&t=279s")
 ```
 
 #### Support Vector Machine
-![](C:/Users/Julian/Desktop/SVM/SVM_picture.png)
+![](C:/Users/Julian/Desktop/SVM_Julian/SVM_picture.png)
 
 #### Plots
 ```{r}
