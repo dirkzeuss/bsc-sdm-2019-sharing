@@ -16,7 +16,7 @@ lynx <- lynx[-w,] #Zeilen mit NA werden gelöscht
 w <- which(is.na(lynx$lat)) #ueberprueft die lat-Spalte, ob NA beinhaltet
 
 lynx$species <- 1 #fuegt eine neue Spalte mit species hinzu
-sp <- sp[,c('lon', 'lat', 'species')] #Beschriftung der Spalten
+lynx <- lynx[,c('lon', 'lat', 'species')] #Beschriftung der Spalten
 head(lynx)
 
 coordinates(lynx) <- ~lon + lat #erstellt einen SpatialPointsDataFrame
@@ -39,7 +39,7 @@ biom <- exclude(bio, v1) #Entfernt Predictor Daten mit einer geringen Korrelatio
 biom
 
 plot(biom[[1]]) #plottet biom1
-points(sp, cex=0.5, pch=16) #fuegt Lynx pardinus Daten hinzu
+points(lynx, cex=0.5, pch=16) #fuegt Lynx pardinus Daten hinzu
 
 proj4string(lynx) <- projection(raster()) #projiziert das sp Objekt in das Koordinatensystem WGS84
 
@@ -61,5 +61,5 @@ m
 p <- predict(m, biom) # erstellt die Karte anhand des Modells und der Umweltdaten
 
 plot(p) #Plottet Karte mit Verbreitungsgebiet
-
+#AUC = Beurteilung der Genauigkeit von Verteilungsmodellen
 
