@@ -28,7 +28,7 @@ set.seed(10)
 backg <- randomPoints(pred_nf, n=100, ext=ext, extf = 1.25)
 colnames(backg) = c('lon', 'lat')
 group <- kfold(backg, 5)
-backg_train <- backg[group == 1, ]
+backg_train <- backg[group != 1, ]
 backg_test <- backg[group == 1, ]
 
 
