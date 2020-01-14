@@ -1,0 +1,75 @@
+---
+title: "Svm_Pakistan"
+author: "Julian Nuhn"
+date: "14-01-2020"
+output: html_document
+---
+
+Source: "http://www.biogeoinformatics.org/, http://www.worldclim.org"
+
+The following script is about a species distribution model with a machine learning system called support vector machine. The intention is to create a model that shows possible distribution areas of butterflies in Pakistan.
+
+### Installation of the required packages
+```{r}
+library(raster)
+library(sdm)
+library(usdm)
+#maybe you have to install the packages first
+```
+### Set directory
+```{r}
+setwd("C:/Users/Julian/Desktop/Pakistan_Svm")
+#set your own working directory
+```
+### Import & edit data
+```{r}
+dis_all <- read.csv("C:/Users/Julian/Desktop/Pakistan_Svm/dis_all.csv") 
+#dis_all = Point data set of all mapped butterflies with coordinates
+
+coordinates(dis_all) <- ~dd_long + dd_lat #create a SpatialPointsDataFrame
+crs(dis_all) <- "+proj=longlat +datum=WGS84" #project data
+
+dis_all$species <- 1 
+#add a column species 
+#you need the column for the model creation
+```
+### Create model 
+```{r}
+bio <- raster::getData('worldclim', var='bio', res=10) 
+#download & import worldclim data
+
+v1 <- vifstep(bio) 
+#checks predictor data for correlation
+
+biom <- exclude(bio, v1) 
+#remove predictor data with less correlation
+
+d <- sdmData(species ~., dis_all, predictors = biom, bg = list(n=1000))
+#species = column we have just added 
+#dis_all = our point data set
+#predictors = worldclim bio
+#bg = background data witch set 1000 background points to improve our model accuracy
+
+m <- sdm(species ~., d, methods=c('svm')) 
+#application of the method (svm = support vector machine)
+
+p <- predict(m, biom)
+#prediction of the species distribution based on our created model and the worldclim data
+plot(p)
+```
+
+### Plot cutting
+```{r}
+pk <- raster::getData('GADM', country = 'PK', level = 0)
+#download Pakistan boundaries 
+
+plot(pk)
+
+cropped_bio <- crop(p, extent(pk))
+clipped_bio <- mask(cropped_bio, pk)
+# cutting out the modelplot with the Pakistan 
+
+plot(clipped_bio, xlab = "Latitude", ylab = "Longitude", main = "Distribution prediction of butterflies in Pakistan")
+
+#green/yellow area = possible distribution
+```
