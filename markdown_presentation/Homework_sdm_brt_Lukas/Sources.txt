@@ -1,0 +1,7 @@
+SOURCES:
+
+--- http://chelsa-climate.org/ access: 05.01.2020
+
+--- J. Elith, J. R. Leathwick and T. Hastie (2008): A working guide to boosted regression trees, Journal of Animal Ecology 2008, 77, 802–813
+
+--- J. Elith,R. J. Hijmans (2019): Spatial Distribution Models, from: https://rspatial.org/sdm/SDM.pdf access: 12.01.2020
