@@ -1,0 +1,201 @@
+---
+title: "SDM Pakistan - Bioclim"
+author: "William James"
+date: "15 1 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+# SDM Pakistan - Bioclim #
+
+
+
+# Distribution data preparation
+
+install.packages("shapefiles")
+
+library(sp)
+library(dismo)
+library(raster)
+library(gbm)
+library(maptools)
+library(rgdal)
+library(shapefiles)
+
+vignette('sdm', 'dismo')
+data("wrld_simpl")
+
+
+###Data distribution
+
+# read Shapefile and create data.frame
+
+dis_shape <- read.shp("H:/Universität Geographie/Projekt/dis_pak/data/distribution_Pakistan_all_test.shp")
+
+dis_dataframe <- as.data.frame(dis_shape)
+
+
+
+# create .csv data
+
+write.csv(dis_shape, file="H:/Universität Geographie/Projekt/dis_pak/data/distribution_shape_csv.csv")
+
+occurrence_csv <- paste0(system.file(package="dismo"), "H:/Universität Geographie/Projekt/dis_pak/data/distribution_shape_csv.csv")
+
+occurrence <- read.csv("H:/Universität Geographie/Projekt/dis_pak/data/distribution_shape_csv.csv")
+
+
+
+# let only appear x and y columns 
+
+occurrence_lonlat <- occurrence [,3:4]
+
+head(occurrence_lonlat)
+
+write.csv(occurrence_lonlat, "H:/Universität Geographie/Projekt/dis_pak/data/distribution.csv")
+
+
+
+### worldclim
+
+worldclim_predictors <- getData("worldclim",var="bio",res=10)
+
+worldclim_predictors
+
+worldclim_predictors <- worldclim_predictors[[c(1,12)]]
+
+names(worldclim_predictors) <- c("Temp","Prec")
+
+names(worldclim_predictors)
+
+values_worldclim_pred <- extract(worldclim_predictors, occurrence_lonlat)
+
+df_occurrence_worldclim <- cbind.data.frame(coordinates(occurrence_lonlat), values_worldclim_pred)
+
+head(df_occurrence_worldclim)
+
+
+
+# plot worldclim data
+
+plot(worldclim_predictors[[1]])
+plot(df_occurrence_worldclim,add=T)
+plot(df_occurrence_worldclim)
+plot(values_worldclim_pred)
+plot(occurrence_lonlat)
+plot(worldclim_predictors[[1]], points(occurrence_lonlat) , add=T)
+plot(df_occurrence_worldclim)
+plot(occurrence_lonlat,worldclim_predictors)
+
+
+
+# Borders 
+
+# get data
+
+data(wrld_simpl)
+
+wrld_simpl
+
+
+
+# plot borders occurence_lotlat
+
+plot(occurrence_lonlat)
+
+plot(wrld_simpl, add=T, border='yellow', lwd=2)
+
+str(dis_dataframe)
+
+head(dis_dataframe)
+
+
+
+# create dataframe of distribution data, .csv
+
+distribution_shape <- read.shp("H:/Universität Geographie/Projekt/dis_pak/data/distribution_Pakistan_all_test.shp")
+distribution_dataframe <- as.data.frame(distribution_shape)
+
+str(distribution_dataframe)
+
+write.csv(distribution_shape, file = "H:/Universität Geographie/Projekt/dis_pak/data/distribution_shape_csv.csv")
+head(distribution_shape)
+
+occurrence_dis <- paste0(system.file(package="dismo"), "H:/Universität Geographie/Projekt/dis_pak/data/distribution_shape_csv.csv")
+head(occurrence_dis)
+
+
+occurrence <- read.csv("H:/Universität Geographie/Projekt/dis_pak/data/distribution_shape_csv.csv")
+head(occurrence)
+
+df_occurrence_lonlat <- occurrence [,2:4]
+head(df_occurrence_lonlat)
+
+write.csv(df_occurrence_lonlat, "H:/Universität Geographie/Projekt/dis_pak/data/df_occurrence_lonlat.csv")
+head(df_occurrence_lonlat)
+
+
+
+## Species distribution data preparation
+
+# read species.csv
+
+table_species_subspecies <- read.csv("H:/Universität Geographie/Projekt/dis_pak/data/distribution_Pakistan_all_species.csv")
+
+species_subspecies <- species_subspecies [,0:2]
+head(species_subspecies)
+
+
+
+# Combine data of species_subspecies and df_occurrence_lonlat in data.frame
+
+combi_occ_species <- data.frame(df_occurrence_lonlat, species_subspecies)
+head(combi_occ_species)
+
+
+
+# Extract raster values from Points
+
+raster_value_pak <- extract(rasterstack_pak_chelsa, occurrence_lonlat)
+
+raster_value_pak
+
+
+
+# dataframe of all data
+
+pakistan_butterflies_train <- data.frame(df_occurrence_lonlat, species_subspecies, raster_value_pak)
+head(pakistan_butterflies_train)
+
+
+
+### bioclim
+
+bc <- bioclim(pred_nf, pres_train)
+plot(bc, a=1, b=2, p=0.85)
+
+
+predictors <- stack(list.files(file.path(system.file(package="dismo"), 'ex'), pattern = 'grd$', full.names = TRUE))
+
+file <- file.path(system.file(package = "dismo"), "ex/distribution_Pakistan_all_test.shp")
+file
+
+
+distribution <- read.table(file, header = TRUE, sep=',')
+presvals <- extract()
+presvals
+set.seed(0)
+backgr <- randomPoints(predictors, 500)
+absvals <- extract(predictors, backgr)
+pb <- c(rep(1, nrow(presvals)), rep(0, nrow(absvals)))
+sdmata <- data.frame(cbind(pb, rbind(presvals, absvals)))
+sdmata[,'biome'] <- as.factor(sdmata[,'biome'])
+
+
+
+
+```
+
+
+
