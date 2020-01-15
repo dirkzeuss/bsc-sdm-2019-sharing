@@ -1,7 +1,7 @@
 ---
-title: "Maxent"
+title: "Maxent_test"
 author: "Alexander Klug"
-date: "12 1 2020"
+date: "15 1 2020"
 output: html_document
 ---
 ## Introduction
@@ -28,7 +28,7 @@ Put the downloaded data as well as the maxent into a single folder, so you have 
 
 If you are running on Windows, start the maxent.bat, otherwise cklick the maxent.jar file. You'll see a picture like this:
 
-![](\sdm_pakistan_maxent/pic/maxent_s1.png)<!-- -->
+![](maxent_s1.PNG)<!-- -->
 
 For now, you'll find three important fields to be filled. First of all, the samples-file. Secondly the environmental layers, that you need to define as continous or categorial. The provided data is all continous. And at last the outputdirecory. You can find each of the files in the provided data. 
 Go on as followed: 
@@ -41,7 +41,7 @@ Go on as followed:
 
 It should look like this
 
-![](\sdm_pakistan_maxent\pic\maxent_s2.png)<!-- -->
+![](maxent_s2.PNG)<!-- -->
 
 Try and let it run.
 
@@ -60,7 +60,7 @@ In the next step, please go to settings in Maxent. For tutorial reasons, remove 
 
 It should look like this
 
-![](\sdm_pakistan_maxent\pic\maxent_s3.png)<!-- -->
+![](maxent_s3.png)<!-- -->
 
 
 You can also find out exactly which variables matter most for the species you are looking at. Remember that if you do the test with all species, each variable matters differently for each species.
@@ -69,7 +69,7 @@ You can also find out exactly which variables matter most for the species you ar
 
 You should get something close to this:
 
-![](\sdm_pakistan_maxent\pic\maxent_s4.png)<!-- -->
+![](maxent_s4.png)<!-- -->
 
 You can see here, which variables are usefull for maxent to modell the distribution of Celastrina.
 In our example you can see e.g. that the anual precipitation is not helping to gain the training data, but generalizes better to give better results for test data.
@@ -84,7 +84,7 @@ Take a look at the .html-file again. You should find responsecurves, which tell 
 
 They should look like this
 
-![](\sdm_pakistan_maxent\pic\maxent_s5.png)<!-- -->
+![](maxent_s5.png)<!-- -->
 
 You can see, that Celastrina somehow responds to a high precipitation in January in Pakistan.
 
@@ -98,7 +98,7 @@ First there is the Replication. If you use a small dataset you can replicate you
 
 The summarized .html file should look like this
 
-![](\sdm_pakistan_maxent\pic\maxent_s6.png)<!-- -->
+![](maxent_s6.png)<!-- -->
 
 The blue field shows the difference between the ten modells and gives information about the variation.
 
