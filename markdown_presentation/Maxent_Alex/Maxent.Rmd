@@ -1,0 +1,139 @@
+---
+title: "Maxent"
+author: "Alexander Klug"
+date: "12 1 2020"
+output: html_document
+---
+## Introduction
+
+This tutorial on how to use maxent is based on the Maxent-Tutorial by Steven J. Phillips, published on the biodiversityinformatics webpage of the american museum of natural history. Link in the references.
+
+
+## Preperation
+
+To get maxent running you need to have [java runtime env. 1.4 or higher](https://www.java.com/de/download/) installed on your computer.
+If you havent already installed it by now, this is the time to do it.
+
+You can [download maxent](http://biodiversityinformatics.amnh.org/open_source/maxent/) for free as its provided as an open source programm.
+You'll need maxent for proceeding in this tutorial, so go on and download it. 
+
+Furthermore download [this data](https://hessenbox.uni-marburg.de/download/MkhFaFFLbnJiZ3Zid0RzQTVZWDFh/playground/Kluga_data/sdm_pakistan_maxent). It provides you with samples and environmental layers, which you need each to process species distributions in maxent.
+
+#### Hind:
+
+Put the downloaded data as well as the maxent into a single folder, so you have a quick overwiev. Maxent can generate a lot of data, so with a good structure you dont lose orientation. 
+
+
+## Step one - Get running
+
+If you are running on Windows, start the maxent.bat, otherwise cklick the maxent.jar file. You'll see a picture like this:
+
+![](\sdm_pakistan_maxent\pic\maxent_s1.png)<!-- -->
+
+For now, you'll find three important fields to be filled. First of all, the samples-file. Secondly the environmental layers, that you need to define as continous or categorial. The provided data is all continous. And at last the outputdirecory. You can find each of the files in the provided data. 
+Go on as followed: 
+
+- link "distribution_pakistan_all.csv" in the samples-folder to the samples. Due to tutorial uses deselect all samples, find Celastrina_argiolus and tick it. 
+
+- link the "Env_layers" folder to the Environmental layers. 
+
+- link the "Output" folder to the directory
+
+It should look like this
+
+![](\sdm_pakistan_maxent\pic\maxent_s2.png)<!-- -->
+
+Try and let it run.
+
+.
+
+.
+
+.
+
+If one did everything right, in the outputfile, you can find a .html file. Open it up and go trought it. Take a look at the variable contributions. Here you can see how important each variable for modelling this species' distribution is. 
+
+
+## Step two - simple statistics
+
+In the next step, please go to settings in Maxent. For tutorial reasons, remove the tick at "ask before overwriting". Then go to "Random Test Percentage" and fill in "30". This will take random 30% of your trainingsamples to validate your model via crossvalidation.
+
+It should look like this
+
+![](\sdm_pakistan_maxent\pic\maxent_s3.png)<!-- -->
+
+
+You can also find out exactly which variables matter most for the species you are looking at. Remember that if you do the test with all species, each variable matters differently for each species.
+
+- go to maxent and tick the box "Do jacknife to measure variable importance". Then run.
+
+You should get something close to this:
+
+![](\sdm_pakistan_maxent\pic\maxent_s4.png)<!-- -->
+
+You can see here, which variables are usefull for maxent to modell the distribution of Celastrina.
+In our example you can see e.g. that the anual precipitation is not helping to gain the training data, but generalizes better to give better results for test data.
+
+## Step three - Take a closer look
+
+Now we'll take a look on how the prediction responds to our variables.
+
+- go to maxent and tick the box "Create response curves". Untick the jackknife. Then run.
+
+Take a look at the .html-file again. You should find responsecurves, which tell you how the single environmental layers influence Celastrina. 
+
+They should look like this
+
+![](\sdm_pakistan_maxent\pic\maxent_s5.png)<!-- -->
+
+You can see, that Celastrina somehow responds to a high precipitation in January in Pakistan.
+
+
+## Step four - Replication and Regularization
+
+There are two more important things to know.
+First there is the Replication. If you use a small dataset you can replicate your modell and summarize the outcome to get a better fit to your modell.  
+
+- Go to Settings and write a "10" behind Replicates. This will do your modell ten times and gives you a summary. Then run.
+
+The summarized .html file should look like this
+
+![](\sdm_pakistan_maxent\pic\maxent_s6.png)<!-- -->
+
+The blue field shows the difference between the ten modells and gives information about the variation.
+
+
+You can also regularize your modell to define how closely-fitted your modell should be. 
+You can find it in the basic settings.
+
+A regularization multiplier < 1 gives you a close fitting modell to your presence data, but will get problems with new given data. 
+
+A regularization multiplier >1 gives you a spread fit which less localizes your presence data, but will better fit to new given data.
+
+To take the right multiplier, it depends on what kind of modell one wants to create.
+
+## Step five - Tasks
+
+To gain a better understanding on maxent, try following tasks and test out maxent. For more explaination take a look into the [maxent tutorial](http://biodiversityinformatics.amnh.org/open_source/maxent/) by Steven J. Phillips.
+
+- change the output formats, what happends in the results?
+
+- How do feature types influence the response curves?
+
+- How are the predictions affected if you change the regularization multiplier?
+
+
+If one creates a well fitting and resilient modell it can be used to create e.g. change detections in species distributions. These can be used to modell the impact of climate change to these distributions.
+
+
+
+
+
+##References
+
+
+Phillips, S. J. 2017. A Brief Tutorial on Maxent. Available from url: [http://biodiversityinformatics.amnh.org/open_source/maxent/.](http://biodiversityinformatics.amnh.org/open_source/maxent/) Accessed on 2020.01.13
+
+
+Fick, S.E. and R.J. Hijmans, 2017. Worldclim 2: New 1-km spatial resolution climate surfaces for global land areas. International Journal of Climatology. Available from url:
+[http://worldclim.org/](http://worldclim.org/) Accesed on 2020.01.12
