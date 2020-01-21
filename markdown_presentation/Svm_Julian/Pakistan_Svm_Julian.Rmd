@@ -1,0 +1,136 @@
+---
+title: "Svm_Pakistan"
+author: "Julian Nuhn"
+date: "14-01-2020"
+output: 
+  html_document:
+    number_sections: true
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+***
+
+# Introduction
+Our university project is about the species richniss of butterflies in Pakistan. To work on this topic we use species distribution models. The following script is about a species distribution model called support vector machine. 
+The intention is to create a model that shows possible distribution areas of one butterflie species in Pakistan.
+In the end you should know what support vector machine are and how to use them in RStudio. 
+
+***
+
+# Installation of the required packages
+Maybe you have to install the packages with the install.packages() function first.
+```{r message = FALSE, warning= FALSE}
+library(raster)
+library(sdm)
+library(usdm)
+library(htmltools)
+library(vembedr)
+```
+
+***
+
+# Theory
+
+## Support vector machine
+Support vector machine algorithm was created for classification problematic and regression analysis. The algorithm classifies objects in classes so that there are large margins around the objects (see image 1). Thats why support vector machine is also called "Large margin classifier". 
+To apply the algorithm you need a trainig data set with objects that belong to a class. Support vector machine finds a hyper-plane that separates its training data in a way that the distance between the hyperplane and the closest points from each class is maximized. These points are called support vectors. If you do not have the optimal hyperplane you could incorecctly classify your data. 
+
+***
+
+### Image 1: 
+
+![](T:/STUDIUM/Marburg/7. Semester/Räumliche Vorhersage/Pakistan_Svm_Julian/image44.png)
+
+Reference: https://amitranga.files.wordpress.com/2014/03/image44.png
+
+***
+
+### Video SVM
+
+I recommend you to watch this video, because it explains and visualizes support vector machine in simple words.
+```{r}
+embed_url("https://www.youtube.com/watch?v=Y6RRHw9uN9o&t=279s")
+```
+
+***
+
+# R Code
+## Set directory
+
+Set your own working directory. You can check your current working directory with the function getwd().
+```{r}
+setwd("T:/STUDIUM/Marburg/7. Semester/Räumliche Vorhersage/Pakistan_Svm_Julian")
+
+```
+
+***
+
+## Import & edit data
+```{r}
+Catopsilia_pomona <- read.csv("T:/STUDIUM/Marburg/7. Semester/Räumliche Vorhersage/Pakistan_Svm_Julian/Catopsilia_pomona.csv") 
+# catopsilia = Point data set of all mapped Catopsilia_pomona in Pakistan
+
+Catopsilia_pomona$Id <- NULL #This column is not needed
+
+colnames(Catopsilia_pomona)[1] <- "species" #Rename the first column 
+
+
+coordinates(Catopsilia_pomona) <- ~Longitude + Latitude #Creates a SpatialPointsDataFrame
+crs(Catopsilia_pomona) <- "+proj=longlat +datum=WGS84" #Projects data
+Catopsilia_pomona$species <- 1 #Adds a column species for our model
+```
+
+***
+
+## Create model 
+
+```{r warning = FALSE, message = FALSE}
+bio <- raster::getData('worldclim', var='bio', res=10) #Download & import worldclim data 
+
+v1 <- vifstep(bio) #Checks predictor data for correlation
+
+biom <- exclude(bio, v1) #Removes predictor data with less correlation
+
+d <- sdmData(species ~., Catopsilia_pomona, predictors = biom, bg = list(n=1000))
+#species = column we have just added 
+#Catopsilia_pomona = our point data set
+#predictors = worldclim bio
+#bg = background data witch set 1000 background points to improve our model accuracy
+
+m <- sdm(species ~., d, methods=c('svm')) #Application of the method (svm = support vector machine)
+
+p <- predict(m, biom) #Prediction of the species distribution based on our created model and the worldclim data
+plot(p)
+```
+
+***
+
+## Plot cutting
+
+```{r}
+pk <- raster::getData('GADM', country = 'PK', level = 0) #Download Pakistan boundaries
+
+plot(pk)
+
+cropped_bio <- crop(p, extent(pk))
+clipped_bio <- mask(cropped_bio, pk)#Cutting out the modelplot with the Pakistan boundaries
+```
+
+***
+
+# Result
+
+The map shows the possible distribution area of Catopsilia pomona in Pakistan (green area). Keep in mind that we used just worldclim data to predict our model. To be able to make a more precise prediction we would need to include more specifically data in our model. 
+```{r}
+plot(clipped_bio, xlab = "Latitude", ylab = "Longitude", main = "Distribution prediction of Catopsilia pomona in Pakistan")
+```
+
+***
+
+# References
+
+Cortes, C. & V. Vapnik (1995): Support-vector networks. Mach Learn 20, 273–297.
+Fick, S.E. & R.J. Hijmans (2017): Worldclim 2: New 1-km spatial resolution climate surfaces for global land areas. International Journal of Climatology.
+Naimi, B. & M.B. Araujo (2016): sdm: a reproducible and extensible R platform for species distribution modelling.
+Tshikolovets, V & J. Pagès (2016): The Butterflies of Pakistan.
