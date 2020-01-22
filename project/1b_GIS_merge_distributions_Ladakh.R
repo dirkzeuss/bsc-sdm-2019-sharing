@@ -16,7 +16,7 @@ rm(list=ls())
 options(max.print=6000)
 
 # setwd
-wd <- "~/Schreibtisch/Projekt_Pakistan/GIS/"
+wd <- "F:/Uni/5. Semester/Pakistan_Projekt/Daten/Ladak_species_merged"
 setwd(wd)
 
 
@@ -28,7 +28,7 @@ ext <- extent(c(58, 83, 23, 38)) #vector (length=4; order= xmin, xmax, ymin, yma
 
 
 # Gitter
-raster_50 <- readOGR("data/Gitter/Gitter_50km.shp") #Einlesen der shapefile
+raster_50 <- readOGR("F:/Uni/5. Semester/Pakistan_Projekt/bsc-sdm-2019/data/Gitter/Gitter_25km.shp") #Einlesen der shapefile
 
 # Country boundaries
 pakistan <- getData("GADM", country="Pakistan", level=0)
@@ -38,17 +38,15 @@ pakistan <- spTransform(pakistan, crs(raster_50))
 
 
 # Distribution data  -------------------------------------------------------------------------------------------------
-all_files_in_distribution     <- list.files(path = "../data/distribution/Pakistan/", recursive = T)
+all_files_in_distribution     <- list.files(path = "F:/Uni/5. Semester/Pakistan_Projekt/Daten/Ladak_species_merged", recursive = T)
 
 shp_paths                     <-  grep(".shp$", all_files_in_distribution, value=TRUE)
 
 # shp_paths                     <-  shp_paths[260:429]
 
 shp_list <- list() 
-for(i in 1:length(shp_paths)){
-     shp_list[[i]]                 <- readOGR(paste0("../data/distribution/Pakistan/", shp_paths[i]))
-     shp_list[[i]]@data$species    <- gsub(".shp", "", basename(shp_paths[i]))
-}
+for(i in 1:length(shp_paths)){shp_list[[i]] <- readOGR(paste0("F:/Uni/5. Semester/Pakistan_Projekt/Daten/Ladak_species_merged/", shp_paths[i]))
+shp_list[[i]]@data$species<- gsub(".shp", "", basename(shp_paths[i]))}
 
 
 # Check projections
@@ -73,7 +71,7 @@ shp_merged@data$Id <- NULL
 str(shp_merged@data)
 
 
-writeOGR(shp_merged, "output/distribution_merged_PK/", driver="ESRI Shapefile", layer="distribution_Pakistan_all_test", overwrite_layer=TRUE)
+writeOGR(shp_merged, "F:/Uni/5. Semester/Pakistan_Projekt/Daten/Ladak_species_merged", driver="ESRI Shapefile", layer="distribution_Pakistan_all_test", overwrite_layer=TRUE)
 
 
 
@@ -100,8 +98,8 @@ cities <- c("Islamabad", "Gilgit", "Chitral", "Lahore", "Karachi", "Ghazi", "Que
 
 # conveninence function to look up and format results  
 GNsearchAF <- function(x) {  
-     res <- GNsearch(name=x, country="PAK", username="dirk.zeuss")  
-     return(res[1, ])  
+  res <- GNsearch(name=x, country="PAK", username="dirk.zeuss")  
+  return(res[1, ])  
 }
 
 options(geonamesUsername="dirk.zeuss")
@@ -116,5 +114,4 @@ GNsearch(name="Islamabad")
 # loop over city names and reformat  
 GNresult <- sapply(cities, GNsearchAF)  
 GNresult <- do.call("rbind", GNresult)  
-GNresult <- cbind(city=row.names(GNresult), subset(GNresult, select=c("lng", "lat", "adminName1"))) 
-
+GNresult <- cbind(city=row.names(GNresult), subset(GNresult, select=c("lng", "lat", "adminName1")))
