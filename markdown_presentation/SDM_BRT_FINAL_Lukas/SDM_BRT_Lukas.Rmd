@@ -1,0 +1,312 @@
+---
+title: "SDM_BRT_FINAL_Lukas"
+author: "Lukas Hilberg"
+date: "25 1 2020"
+output: html_document
+---
+***
+# Introduction
+
+This projekt deals with species distribution modelling of butterfly species in Pakistan. In the following 
+script, distribution data of butterfly species as well as environmental data from http://chelsa-climate.org/ database is prepared to perform "boosted regression tree"(BRT) modelling process. BRT is an ensemble of methods for fitting statistical models (Elith et al. 2008). Aim of this work is to use the created model in order to 
+predict on potential distribution areas of a particular buttefly species.
+
+***
+
+# Theory: boosted regression trees
+
+ - Ensemble of multiple methods to fit data to 
+   a statistical model.
+ - combines the strength of two different algorithms: 
+   "Regression Trees" (predictors + response, recursive binary splits) 
+   and "Boosting" (adaptive method, combining several simple models for 
+   increased model performance)
+ 
+ benefits of BRT-modelling:
+ 
+ - handle different types of predictor variables
+ - handles missing data automatically
+ - can fit complex non-linear relationships, and automatically handles 
+   interaction effects between predictors
+ - fitting multiple trees -> powerful ecological insight, superior 
+   predictive performance
+
+***
+
+# Video BRT
+
+Befor we start, i recommend you to watch the following video. It gives further information and clarification concerning BRT. It illustrates how to use BRT and also the mathmatics behind it.
+```{r}
+library(vembedr)
+embed_url("https://www.youtube.com/watch?v=3CC4N4z3GJc")
+```
+
+***
+
+# Librarys
+
+First of all, you will need the following librarys for the process:
+
+```{r message = FALSE, warning= FALSE}
+
+library(dismo)
+library(raster)
+library(gbm)
+library(maptools)
+library(rgdal)
+library(shapefiles)
+
+```
+
+***
+
+After loading in the librarys, we can start with the data preparation now.
+***
+
+# Data preparation: distribution data
+
+```{r}
+# distribution-data
+
+distribution_shape <- read.shp("C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/distribution_Pakistan_all_test.shp")
+
+distribution_dataframe <- as.data.frame(distribution_shape)
+
+occurrence_csv <- paste0(system.file(package="dismo"), "C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/distribution_shape_csv.csv")
+head(occurrence_csv)
+
+occurrence <- read.csv("C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/distribution_shape_csv.csv")
+head(occurrence)
+
+occurrence_lonlat <- occurrence [,3:4]
+head(occurrence_lonlat)
+
+dataframe_occurrence_record_lonlat <- occurrence [,2:4]
+head(dataframe_occurrence_record_lonlat)
+write.csv(dataframe_occurrence_record_lonlat, "C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/dataframe_occurrence_record_lonlat.csv")
+head(dataframe_occurrence_record_lonlat)
+
+```
+***
+Now we have built a dataset of the distribution data containing different types of data, showing the lat/lon values of all species sightings.
+
+# Data preparation: species and subspecies names
+
+We go on with cutting out the species and subspecies names of our data.
+***
+```{r}
+# read in species_csv
+
+species_subspecies <- read.csv("C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/Pakistan_alles/distribution_Pakistan_all_species.csv")
+
+species_subspecies_cut <- species_subspecies [,0:2]
+head(species_subspecies_cut)
+
+```
+***
+Now we can combine the two generated dataframes to one:
+
+# Combine species + distribution + cut (subset) for only 1 species (--> Pyrgus_cashmirensis)
+***
+```{r}
+species_distribution_combined <- data.frame(dataframe_occurrence_record_lonlat, species_subspecies_cut)
+head(species_distribution_combined)
+
+# subset for species: Pyrgus_cashmirensis
+
+subset_Pyrgus_cashmirensis <- subset(species_distribution_combined, species.C.80=="Pyrgus_cashmirensis")
+subset_Pyrgus_cashmirensis
+
+subset_Pyrgus_cashmirensis_lat_lon <- subset_Pyrgus_cashmirensis[,2:3]
+subset_Pyrgus_cashmirensis_lat_lon
+```
+***
+#final presence data
+***
+```{r}
+
+p_a <- 1
+
+final_presence <- cbind(subset_Pyrgus_cashmirensis_lat_lon, p_a)
+final_presence
+```
+***
+Now we have the final presence dataset for the species Pyrgus cashmirensis. Later we will combine it with a generated set of pseudo-absence data and the predictor varriables of the environmental layers.
+
+In order to convert our environmental data into the desired dataframe for model procession, have a look at the following procedure:
+***
+# Preparation of environmental data: chelsa-dataframe
+***
+```{r}
+## chelsa data preparation ####
+
+#merge
+
+merged_chelsa_annual_mean_temp_path <- "C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/Pakistan_alles/chelsa/annual_mean_temperature/"
+merged_chelsa_annual_mean_temp_path
+
+merged_chelsa_annual_mean_temp_files <- list.files("C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/Pakistan_alles/chelsa/annual_mean_temperature/")
+merged_chelsa_annual_mean_temp_files
+
+
+raster_list <- list(merged_chelsa_annual_mean_temp_files) 
+raster_list
+for(i in 1:12)
+{
+  tilesloop <- paste0(merged_chelsa_annual_mean_temp_path, merged_chelsa_annual_mean_temp_files[i])
+  tilesloop       
+  raster_list[[i]] <- raster(tilesloop)
+  rasterliste <- raster_list[[i]]
+  rasterliste
+}
+
+raster_list$filename     <- "C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/Pakistan_alles/chelsa/annual_mean_temperature/merged/merged_chelsa_annual_mean_temp.tif"
+exporttif <- raster_list$filename 
+exporttif
+raster_list$overwrite    <- TRUE
+
+
+all_merged_chelsa_annual_mean_temp_raster <- do.call(raster::merge, raster_list, quote=TRUE)
+all_merged_chelsa_annual_mean_temp_raster
+plot(all_merged_chelsa_annual_mean_temp_raster, main="all_merged chelsa annual mean temperature")
+
+chelsa_annual_global_prec <- 
+  raster("C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/Pakistan_alles/chelsa/annual_global_prec/CHELSA_bio10_12.tif")
+chelsa_prec_warmest_quarter <- 
+  raster("C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/Pakistan_alles/chelsa/prec_warmest_quarter/CHELSA_bio10_18.tif")
+chelsa_warmest_quarter_mean_temp <- 
+  raster("C:/Users/ich/Desktop/UNI/räumliche_Vorhersage/Pakistan_alles/chelsa/warmest_quarter_mean_t_global/CHELSA_bio10_10.tif")
+
+plot(all_merged_chelsa_annual_mean_temp_raster, main="all_merged chelsa annual mean temperature")
+plot(chelsa_annual_global_prec, main="chelsa annual global prec")
+plot(chelsa_prec_warmest_quarter, main="chelsa prec warmest quarter")
+plot(chelsa_warmest_quarter_mean_temp, main="chelsa warmest quarter mean temperature")
+
+# crop onto pakistan extent
+
+extend_pakistan <- extent(c(58, 83, 23, 38))
+
+cropped_chelsa_annual_mean_temp_raster <- crop(all_merged_chelsa_annual_mean_temp_raster, extend_pakistan)
+cropped_chelsa_annual_mean_temp_raster
+plot(cropped_chelsa_annual_mean_temp_raster)
+#plot(wrld_simpl, add = TRUE)
+
+cropped_chelsa_annual_global_prec <- crop(chelsa_annual_global_prec,extend_pakistan)
+cropped_chelsa_annual_global_prec
+plot(cropped_chelsa_annual_global_prec)
+#plot(wrld_simpl, add = TRUE)
+
+cropped_chelsa_prec_warmest_quarter <- crop(chelsa_prec_warmest_quarter, extend_pakistan)
+cropped_chelsa_prec_warmest_quarter
+plot(cropped_chelsa_prec_warmest_quarter)
+#plot(wrld_simpl, add = TRUE)
+
+cropped_chelsa_warmest_quarter_mean_temp <- crop(chelsa_warmest_quarter_mean_temp, extend_pakistan,)
+cropped_chelsa_warmest_quarter_mean_temp
+plot(cropped_chelsa_warmest_quarter_mean_temp)
+#plot(wrld_simpl, add = TRUE)
+
+# rasterstack
+
+rasterstack_pakistan_chelsa <- raster::stack(cropped_chelsa_annual_global_prec, 
+                                             cropped_chelsa_annual_mean_temp_raster, 
+                                             cropped_chelsa_prec_warmest_quarter, 
+                                             cropped_chelsa_warmest_quarter_mean_temp)
+rasterstack_pakistan_chelsa
+plot(rasterstack_pakistan_chelsa)
+
+# dataframe chelsa
+
+pakistan_chelsa_dataframe <- as.data.frame(rasterstack_pakistan_chelsa)
+head(pakistan_chelsa_dataframe)
+str(pakistan_chelsa_dataframe)
+
+```
+***
+# Summary chelsa data preparation:
+
+The procedure above shows how to merge several environmental layers of one kind in order to use it for the model. After that it is shown how to read in all files needed for prediction, as well as cropping it onto the right extent (extent of pakistan) and adding country borders.
+
+Finally, the created raster stack of all four predictor sets is transformed into a data frame so we can combine it with our presence and absence data later. 
+***
+# Generate pseudo-absence data with dismo package
+
+```{r}
+pseudo_absence_pakistan <- randomPoints(cropped_chelsa_annual_global_prec, 42)
+pseudo_absence_pakistan
+head(pseudo_absence_pakistan)
+plot(pseudo_absence_pakistan)
+
+# add column "0" for absence:
+
+p_a <- 0
+
+final_absence <- cbind(pseudo_absence_pakistan, p_a)
+final_absence
+
+# rename latlon columns
+
+final_absence_df <- as.data.frame(final_absence)
+final_absence_df
+colnames(final_absence_df)
+names(final_absence_df)[1] <- "shp.x"
+names(final_absence_df)[2] <- "shp.y"
+final_absence_df
+
+```
+***
+Now we have generated a set of 42 random points as absence data, because according to Elith et al. 2008 it is advisable to use the exact same number of absences as we have it for presences. The data was also given the name "0" as needed for absence data for BRT-modelling. We made sure the data is in the correct form by renaming the colums with the same names as used in the presence dataframe. 
+
+Finally, we can combine presence and absence data:
+***
+
+# Combine presence + absence
+
+```{r}
+final_p_a_lat_lon <- rbind(final_presence, final_absence_df)
+final_p_a_lat_lon
+```
+***
+
+# Extract rastervalues of chelsa data for whole point data:
+
+Since the extract function of the raster package requires a data frame with lat/lon values only, we cut them out of our presence/absence dataset.
+
+```{r}
+final_lat_lon <- final_p_a_lat_lon[,1:2]
+final_lat_lon
+
+rasValue_pakistan_all <- extract(rasterstack_pakistan_chelsa, final_lat_lon)
+
+rasValue_pakistan_all
+```
+***
+# Final training data
+
+Now we can create a dataframe out of our generated datasets for 1. occurences, 2. absences and 3. environmental predictors:
+
+```{r}
+pakistan_butterflies_train_final_Pyrgus_cashmirensis <- data.frame(final_p_a_lat_lon, rasValue_pakistan_all)
+pakistan_butterflies_train_final_Pyrgus_cashmirensis
+```
+***
+# Final model
+
+```{r warning= FALSE}
+Pyrgus_cashmirensis.tc5.lr01 <- gbm.step(data=pakistan_butterflies_train_final_Pyrgus_cashmirensis, gbm.x = 4:7, gbm.y = 3, family = "bernoulli", tree.complexity = 5, learning.rate = 0.01, bag.fraction = 0.5)
+```
+***
+A model is built with the pakistan training data, using chelsa climate data as predictors and the binary absence/presence data as the response variable (as required by family = "bernoulli" in the BRT-model).
+
+We are using a tree complexity of 5, a learning rate of 0,01 (since we have only 84 presence/absence points we need a low learning rate) and a bag fraction of 0,5.
+
+# Sources
+
+- Elith, J., Leathwick, J. R. and Hastie, T. (2008): A working guide to boosted regression trees, Journal of Animal Ecology 77, 802–813.
+
+- Hijmans, R. J. and Elith, J. (2019): Spatial Distribution Models, https://rspatial.org/sdm/SDM.pdf 
+access: 12.01.2020 
+
+- https://www.youtube.com/watch?v=3CC4N4z3GJc access: 25.01.2020 
+
+- Oliver, J. (2018): A very brief introduction to species distribution models in R https://jcoliver.github.io/learn-r/011-species-distribution-models.html access: 23.01.2020
