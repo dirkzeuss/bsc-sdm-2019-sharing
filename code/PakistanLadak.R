@@ -15,6 +15,7 @@ for(i in 1:length(shp_paths)){
 
 shp_merged <- do.call(raster::bind, shp_list, quote=T)
 
+
 shp_merged@data$subspecies[!is.na(shp_merged@data$Subspecies)] <- shp_merged@data$Subspecies[!is.na(shp_merged@data$Subspecies)]
 shp_merged@data$Subspecies <- NULL
 
@@ -30,6 +31,9 @@ lad <- readOGR("F:/Projekt_Parkistan/bsc-sdm-2010-hessenbox/Ladak_maps_final/dis
 pak_df <- as.data.frame(pak)
 lad_df <- as.data.frame(lad)
 
-all <- merge(pak_df,lad_df, by= "species")
-all
+all <- merge(pak_df,lad_df, all.x = TRUE, all.y = FALSE)
+
+all$id <- NULL
+
+write.table(all, file = "F:/Projekt_Parkistan/bsc-sdm-2010-hessenbox/PakistanLadak.csv", quote = FALSE, row.names = FALSE, sep = ";")
 
