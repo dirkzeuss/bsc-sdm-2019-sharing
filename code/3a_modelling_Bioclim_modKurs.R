@@ -15,7 +15,7 @@
   rm(list=ls())
   
   # Set working directory
-  wd <- "/home/dirk/bsc-sdm-pakistan/"
+  wd <- "/home/dirk/Schreibtisch/Projekt_Pakistan/"
   setwd(wd)
   
   # Extent for computational region
@@ -36,8 +36,8 @@
   shp_paths                     <- grep(".shp$", all_files_in_distribution, value=TRUE) # Select shapefiles
   
   # Read in multiple shapefiles as elements of a list
-  # number_of_species_to_process <- 5 
-  number_of_species_to_process <- length(shp_paths) # All species
+   number_of_species_to_process <- 5 
+  #number_of_species_to_process <- length(shp_paths) # All species
   
   shp_list <- list() 
     for(i in 1:number_of_species_to_process){ # Only number_of_testspecies for testing
