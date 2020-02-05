@@ -1,9 +1,7 @@
 ###  GIS Projekt Tagfalter Pakistan
 ##   Methode: Maxent
-##   Alexander Klug, Dirk Zeuss 
-#    03.02.2020
-
-# This is just a rough template and MUST be adjusted!
+##   Alexander Klug 
+#    05.02.2020
 
 #### Praeambel  ----------------------------------------------------------------------------------------------
 library("raster")
@@ -15,7 +13,7 @@ library("dismo")
 rm(list=ls())
 
 # Set working directory
-wd <- "~/Schreibtisch/Projekt_Pakistan/GIS"
+wd <- "D:/Kluga/GIS"
 setwd(wd)
 
 # Extent for computational region
@@ -25,31 +23,41 @@ ext <- extent(c(58, 83, 23, 38)) # in wgs 84, c(-4500000, 70000, -2500000, 30000
 #### Read in and prepare data  ----------------------------------------------------------------------------------------------
 
 # Grid
-raster_50 <- readOGR("C:/Users/Alexander/PowerFolders/bsc-sdm-2019 (Funktions-Account uilehre)/data/shape/Gitter/Gitter_50km.shp") # Read in grid. CRS is EPSG 102025 (Albers equal area). This is the project crs.
+raster_50 <- readOGR("../data/shape/Gitter/Gitter_50km.shp") # Read in grid. CRS is EPSG 102025 (Albers equal area). This is the project crs.
+
+# Env_Layer
+env_layer <- getData("worldclim", var = 'tmin', res = 10) # Just some worldclim-data, to get crs from Maxent-modelling
 
 # Country boundaries
 pakistan <- getData("GADM", country="Pakistan", level=0)
 pakistan <- spTransform(pakistan, crs(raster_50)) # Transforms to EPSG 102025
 
-# Distribution data  
+### Modelling--Maxent-----------------------------------------------------------------------------------------------------------------------------
 
-all_files_in_distribution <- list.files(path = "C:/Users/Alexander/Desktop/GIS/maxent/output/", recursive = T) # List all files
-asc_paths               <- grep(".asc$", all_files_in_distribution, value=TRUE) # Select asciifiles
+###########-------------------------------------------------------------------------###########
+# Before one continues, you need to process Maxent extern, choose ../data/Output/Maxent_Output#
+# for outputdirectory, so one can access the .asc files produced by Maxent in R.              #
+###########-------------------------------------------------------------------------###########
+
+# Distribution data (Maxent Output)
+
+all_files_in_distribution   <- list.files(path = "../data/Output/Maxent_Output", recursive = T) # List all files
+asc_paths                   <- grep(".asc$", all_files_in_distribution, value=TRUE)             # Select asciifiles
 
 number_of_species_to_process <- length(asc_paths) # All species
 
 asc_list <- list() 
-for(i in 1:number_of_species_to_process){ # Only number_of_testspecies for testing
-  asc_list[[i]]                 <- raster(paste0("C:/Users/Alexander/Desktop/GIS/maxent/output/", asc_paths[i]))
-  #  writeRaster(asc_list[[i]], paste0("C:/Users/Alexander/Desktop/GIS/maxent/output/", asc_paths[i], ".tif"), format = "GTiff", overwrite = TRUE)
-  #  writeOGR(asc_list[[i]], paste0("C:/Users/Alexander/Desktop/GIS/maxent/output/Shp/", asc_paths[i], ".shp"), layer = asc_paths[i], driver = "ESRI Shapefile")
+for(i in 1:number_of_species_to_process){                                                         # Only number_of_testspecies for testing
+  asc_list[[i]]                 <- raster(paste0("../data/Output/Maxent_Output/", asc_paths[i]))
+  crs(asc_list[[i]])            <- crs(env_layer)                                                 #add crs back (lost in MaxEnt)
+  asc_list[[i]]                 <- projectRaster(asc_list[[i]], crs = crs(pakistan))              #reproject to EPSG 102025
+  species_name                  <- labels(asc_list[[i]])                                          #get species names for saving
+  writeRaster(asc_list[[i]], filename = file.path(wd, "../data/Output/Maxent_Output_Tiff", species_name), format = "GTiff", overwrite = TRUE)
 }
 
-### Modelling ----------------------------------------------------------------------------------------------------------------------
-# Workflow: First, only one species then many species in a loop.
-# Objective is the creation of an area-wide presence/absence map.
+### Modelling--richness--map----------------------------------------------------------------------------------------------------------------------
 
-
+## First for one species: --
 
 # Reality check
 plot(asc_list[[i]])
@@ -69,24 +77,27 @@ result_presence_absence <- reclassify(asc_list[[i]], rcl = classification_matrix
 
 plot(result_presence_absence)
 
-asc_list[[1]]
+asc_list[[i]]
+
+
+
 ## Now for many species: ---
 
 presence_absence_maps <- list()
 for(i in 1:length(asc_list))try({
-  threshold_maxent  <- raster::quantile(asc_list[[i]])[4]
-  classification_matrix <- matrix(c(0, threshold_maxent, 0, threshold_maxent, 1, 1),ncol=3, byrow = TRUE)
-  result_presence_absence <- reclassify(asc_list[[i]], rcl = classification_matrix)
-  presence_absence_maps[[i]] <- result_presence_absence
-  species_name <- asc_paths[[i]]
-  names(presence_absence_maps[[i]]) <- species_name # add species name to layer
+  threshold_maxent                   <- raster::quantile(asc_list[[i]])[4]
+  classification_matrix              <- matrix(c(0, threshold_maxent, 0, threshold_maxent, 1, 1),ncol=3, byrow = TRUE)
+  result_presence_absence            <- reclassify(asc_list[[i]], rcl = classification_matrix)
+  presence_absence_maps[[i]]         <- result_presence_absence
+  species_name                       <- labels(asc_list[[i]])
+  names(presence_absence_maps[[i]])  <- species_name            # add species name to layer
   # Write out each modeled species as GeoTiff
   # If you don net yet have the directory, create it with e.g. dir.create(file.path(wd, "output/modelling/bioclim"), recursive=TRUE)
-  writeRaster(presence_absence_maps[[i]], filename = file.path(wd, "../modelling", species_name), format="GTiff", overwrite = TRUE)
+  writeRaster(presence_absence_maps[[i]], filename = file.path(wd, "../data/Output/presence_absence_maps", species_name), format="GTiff", overwrite = TRUE)
 })
 
 
-# Remove empty (null) entries. In this case those with only one record, which failed to be modelled with bioclim().
+# Remove empty (null) entries. Normally they shouldnt exist, because MaxEnt removes all species' with less then five records.
 presence_absence_maps <- presence_absence_maps[!unlist(lapply(presence_absence_maps, is.null))] 
 
 # Create RasterStack from list
@@ -103,16 +114,16 @@ plot(pakistan, add=TRUE)
 ## Write out ----------------------------------------------------------------------------------------------------------------------
 
 # GeoTiff
-writeRaster(richness_map, filename = file.path(wd, "../modelling", "richness_map_maxent"), format="GTiff")
+writeRaster(richness_map, filename = file.path(wd, "../data/Output/richness_maps", "richness_map_maxent"), format="GTiff", overwrite = TRUE)
 
 # JPG
-jpeg(filename = file.path(wd, "../modelling", "richness_map_maxent.jpg"), width = 2000, height = 2000, quality = 99)
+jpeg(filename = file.path(wd, "../data/Output/richness_maps", "richness_map_maxent.jpg"), width = 2000, height = 2000, quality = 99)
 plot(richness_map)
 plot(pakistan, add=TRUE)
 dev.off()
 
 # PDF
-pdf(file.path(wd, "../modelling", "richness_map_maxent.pdf"), width = 10, height = 10)
+pdf(file.path(wd, "../data/Output/richness_maps", "richness_map_maxent.pdf"), width = 10, height = 10)
 plot(richness_map)
 plot(pakistan, add=TRUE)
 dev.off()
