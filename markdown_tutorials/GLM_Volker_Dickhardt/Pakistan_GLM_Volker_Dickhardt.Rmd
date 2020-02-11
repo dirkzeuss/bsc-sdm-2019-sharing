@@ -1,0 +1,301 @@
+---
+title: "Generalized Linear Models"
+author: "Volker Dickhardt"
+date: "11.02.2020"
+output: 
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    theme: darkly
+---
+#1. Generalized linear Models
+
+>A generalized linear model (GLM) is an extension of the linear regression model. Linear models have a dependent variable Y witch is equal to a point on the linear fuktion <p style="color:#FF8000">**Y = ax + b**.</p> In GLMs the predictor variables X, in our case biofactors like precipitation, are joined to create a linear predictor. This linear predictor is connected with the response variable Y via a link funktion. Therefor the distribution of the response variable does not nessarily have to be Gaussian. It can also be e.g. Poisson or binomial.
+
+
+
+#2. Data preperation
+
+>Load packages:
+
+```{r message=FALSE, warning=FALSE}
+library("raster")
+library("rgdal")
+library("maptools")
+library("geonames")
+library("dismo")
+```
+
+>Clear workspace
+
+```{r}
+rm(list=ls())
+```
+
+
+
+>Set a seed to ensure reproducibility
+
+```{r}
+set.seed(0)
+```
+
+
+
+
+##2.1 Read in a Shapefile
+
+>Read in the Shapefile "distribution_merged_Pakistan", These file shows the records of the individual species of butterflys in Pakistan.
+
+```{r}
+butterflys <- readOGR("E:/Uni/5. Semester/Pakistan_Projekt/bsc-sdm-2019/data/distribution/distribution_merged_Pakistan")
+pakistan <- getData("GADM", country="Pakistan", level=0)  #Load the boundaries of pakistan
+plot(pakistan)                                            #Plot the boundaries of pakistan
+plot(butterflys, add = TRUE, col='blue')                  #We add all recorded butterflys to our plot
+```
+
+>Now we can check the data. We see, that some of the points are outside pakistan. The majority lies within the boundarys.
+
+>Set working directory
+
+```{r}
+wd <- "E:/Uni/5. Semester/Pakistan_Projekt/GLM"
+setwd(wd)
+```
+
+>This code extracts the coordinates of the records out of the shapefile and write them into a new dataframe called <p style="color:#FF8000">**"butterf"**.</p>
+
+```{r}
+head(butterflys)                     #Shows the head of the butterfly dataframe
+but_cor<-coordinates(butterflys)     #Seperates just the coordinates
+butterf<-as.data.frame(but_cor)
+colnames(butterf) = c('x','y')       #Changes the names of the two columns
+```
+
+>For this example we need the records of one species <p style="color:#FF8000">**e.g.: *Parnara bada*.**.</p>  Therefor we seperate the coordinates for just one species:
+
+```{r}
+Parnara_bada <- butterf[111:145,] # extracts the coordinates of *Parnara bada*
+```
+
+![Parnara bada](E:\Uni\5. Semester/Pakistan_Projekt/GLM/Parnara_bada_sida.jpg)
+
+>Source: <https://en.wikipedia.org/wiki/Parnara_bada#/media/File:Parnara_bada_sida.jpg>. Date: 07.02.2020
+
+
+
+##2.2 Preperation of Raster Data
+
+>Load Raster Data and stack the three Layers, plots the layers with the extent. These raster layer will be our predictors for the GLM. 
+
+>At first we load the Chelsa data. You can get different biovariables on the website <http://chelsa-climate.org/downloads/>
+
+>We have downloaded three layers:<br>
+Chelsa_bio10_10 = warmest quarter mean Temperature global<br>
+Chelsa_bio10_12 = annual global precipitation<br>
+Chelsa_bio10_18 = precipitation of the warmest quarter
+
+```{r}
+files<-list.files("E:/Uni/5. Semester/Pakistan_Projekt/Daten/Raster/Predictors",pattern = ".tif", full.names = TRUE) # This line creates a vector with all tif-files in this location
+chelsa <- raster::stack(files)
+
+chelsa
+nlayers(chelsa) # shows the number of layers in the raster stack
+crs(chelsa) # shows the coordinate referent system of the layer
+```
+
+>Loads the three Worldclim-Layers, Source: <http://worldclim.org/version2>
+
+```{r}
+wc_tavg<-raster("E:/Uni/5. Semester/Pakistan_Projekt/Daten/Raster/Worldclim/worldclim_temp_avg/tavg_mean.tif",pattern = ".tif", full.names = TRUE)
+wc_tavg
+wc_tmax<-raster("E:/Uni/5. Semester/Pakistan_Projekt/Daten/Raster/Worldclim/worldclim_temp_max/tmax_mean.tif",pattern = ".tif", full.names = TRUE)
+wc_tmax
+wc_tmin<-raster("E:/Uni/5. Semester/Pakistan_Projekt/Daten/Raster/Worldclim/worldclim_temp_min/tmin_mean.tif",pattern = ".tif", full.names = TRUE)
+wc_tmin
+```
+
+>Stack the worldclim layers together.
+
+```{r}
+wc_layers <- c(wc_tavg,wc_tmax,wc_tmin)
+wc<-stack(wc_layers)
+```
+
+>Creates an extent with the extent. We need an extent to ensure, that every layer has the same extent.
+
+```{r}
+ext <- extent(c(60, 78, 23, 38))
+ext
+```
+
+>With the comand "crop" you cut out a raster layer with a polygon, in this case with the extent.
+
+```{r}
+chelsa_ext<-crop(chelsa,ext)
+wc_ext<-crop(wc,ext)
+chelsa_ext
+wc_ext
+```
+
+>Now we can stack the layers together. Make sure that every layer has the same extent, otherwise the command "stack" won`t work.
+
+```{r}
+b <- c(chelsa_ext,wc_ext)
+predictors <- stack(b)
+```
+
+>We can check the data by plotting a map with the first Layer of the predictors and all records. The blue points are all butterfly recorts. The red point are recorts of Parnara bada.
+
+```{r}
+data(wrld_simpl)
+plot(predictors,1, main = "Check the data")
+plot(wrld_simpl, add=TRUE, )
+points(butterf, col='blue')
+points(Parnara_bada, col="red", pch=18)
+```
+
+
+
+##2.3 The right data structure
+
+>We need some background data for the absent data, This funktion creates random Points in the observation area.
+
+```{r}
+backgr <- randomPoints(predictors, nrow(Parnara_bada))  #Creates as much points as we have present points in Parnara_bada
+```
+
+>For a generalized linear model we need present and absent data. In the vektor "presvals" are the values of the predictor layers at the lokation of the records. In "absvals" are the values at the lokation of the randam points.
+
+```{r}
+presvals <- extract(predictors, Parnara_bada)
+absvals <- extract(predictors, backgr)
+```
+
+>We create a vektor (pb) witch writes for absent data 0 and for present data 1. Afterwards we build a dataframe with this vector and the present and absent data
+
+```{r}
+pb <- c(rep(1, nrow(presvals)), rep(0, nrow(absvals)))
+sdmdata <- data.frame(cbind(pb, rbind(presvals, absvals)))
+```
+
+>The command kfold gives every recort in the dataframe a number between 1 and k (in this case 5). We need this operation to get train and test data to test the model later on.
+
+```{r}
+group <- kfold(Parnara_bada, 5)
+pres_train <- Parnara_bada[group != 1, ]
+pres_test <- Parnara_bada[group == 1, ]
+```
+
+>Now we do the same for the background data.
+
+```{r}
+backg <- randomPoints(predictors, nrow(Parnara_bada), ext=ext, extf = 1.05) # With extf the extent increases
+colnames(backg) = c('x','y')
+group <- kfold(backg, 5)
+backg_train <- backg[group != 1, ]
+backg_test <- backg[group == 1, ]
+```
+
+>We create a matrix out of the present and background training data
+
+```{r}
+train <- rbind(pres_train, backg_train)
+```
+
+>We build a dataframe with the training data and the predictor layers
+
+```{r}
+pb_train <- c(rep(1, nrow(pres_train)), rep(0, nrow(backg_train)))
+envtrain <- extract(predictors, train)
+envtrain <- data.frame( cbind(pa=pb_train, envtrain) )
+head(envtrain) #shows the head of the dataframe
+```
+
+>The same for the test data. You need train and test-data if you want to do cross-validation later on.
+
+```{r}
+testpres <- data.frame( extract(predictors, pres_test) )
+testbackg <- data.frame( extract(predictors, backg_test) )
+```
+
+
+
+
+
+#3 From the model to a map
+
+##3.1 Build the model
+
+>We have everything to fit the generalized linear model. The first statement in the glm-funktion is the formula. In our case we have the depending variabel "pa", witch can have the value 0 or 1. "1" stands for the presence and "0" for the absence of an individual of *Parnara bada*. 
+The secont part of the formula are the values of the enviroment-layers witch are within the envtrain data. The Point (.) you put every value into the model.  
+The family statment is for choosing a distribution out of the exponantial family. When you have binary data, you should use binomial in the family-statement with the logit link funktion.
+
+```{r}
+m1 <- glm(pa ~ .,family = binomial(link = "logit"), data=envtrain)
+m1
+summary(m1)
+```
+
+>The residual deviance gives us the quality of the fit of the model. The higher the number, the worse the fit. 
+
+>The coefficients of worldclim are significant, while the coefficients of Chelsa aren`t significant. 
+On the output we see the AIC (Akaike Information Criterion). With this value you are able to compare models with each other. It is recommended to choose the model with the smallerst AIC  (Wollschläger 2017).
+
+
+
+##3.1 Prediction with the model
+
+```{r}
+prediction <- predict(predictors,m1, ext=ext)
+plot(prediction, main = "Prediction for Parnara bada")
+plot(wrld_simpl, add=TRUE)
+points(Parnara_bada, col="red", pch=18)
+```
+
+
+
+##3.2 Threshold
+
+> For the assessment of the occurrence of a species it is necessary to create a threshold. In this particular case we use the upper quantile as the threshold. Liu et.al (2005) shows several other options.
+
+> We want to have a map witch shows the occurrence as a "1" and the absence of *Parnara bada* as a "0". For this reason we need to reclassify the prediction. Every value witch is under the threshold becomes a "0", the ones over the threshold a "1".
+
+```{r}
+threshold_glm <- raster::quantile(prediction)[4]
+classification_matrix <- matrix(c(minValue(prediction),threshold_glm , 0,   # This function creates a matrix for the                                                                                               reclassify-funktion
+                                    threshold_glm, maxValue(prediction), 1),  
+                                   ncol=3, byrow = TRUE)
+result_presence_absence <- reclassify(prediction, rcl = classification_matrix) #Reclassification for the prediction
+presence_absence_map <- result_presence_absence
+plot(presence_absence_map, main = "Presence/absence of Parnara bada")
+plot(wrld_simpl, add=TRUE)
+points(Parnara_bada, col="red", pch=18)
+```
+
+> The map shows <p style="color:#FF8000">**the distribution area of *Parnara bada*.**.</p> In the green area the conditions for *Parnara bada* are given. The red pionts are the records of the species.
+
+> The last step is to write out and save the map. Therefor you can use the writeRaster argument. Make sure, that you set the path correctly.
+
+```{r}
+writeRaster(presence_absence_map, filename = file.path("E:/Uni/5. Semester/Pakistan_Projekt/GLM/", "Distribution_output"), format="GTiff", overwrite = TRUE)
+```
+
+
+
+# References
+
+>Baltes-Goetz, B. (2016): Generalisierte lineare Modelle und GEE-Modesse in SPSS Statistics. <https://www.uni-trier.de/fileadmin/urt/doku/gzlm_gee/gzlm_gee.pdf> Date: 20.01.2020. Trier.
+
+
+> Hijmans, R.H., Elith, J. (2019): Spatial Distribution Models. <https://rspatial.org/sdm/SDM.pdf> Date: 10.Jan.2020.
+
+> Hijmans, R.H. (2019): Point pattern analysis. <https://rspatial.org/raster/analysis/8-pointpat.html> Date: 08.Jan.2020.
+
+>Liu, C., Berry, P. M., Dawson, T.P., Pearson, R. G. (2005): Selecting thresholds of occurrence in the prediction of species distributions. <https://onlinelibrary.wiley.com/doi/pdf/10.1111/j.0906-7590.2005.03957.x> Date: 29.Jan.2020.
+
+> Tshikolovents, V. (2016): The Butterflies of Pakistan. Kiew
+
+> Wollschlaeger, D. (2017): Grundlagen der Datenanalyse mit R: Eine anwendungsorientierte Einführung. 4. Auflage. Berlin.

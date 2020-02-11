@@ -25,8 +25,11 @@ shp_merged
 
 writeOGR(shp_merged, "F:/Projekt_Parkistan/bsc-sdm-2010-hessenbox/Ladak_maps_final", driver="ESRI Shapefile", layer="distribution_Ladakh_all_test", overwrite_layer=TRUE)
 
-pak <- readOGR("F:/Projekt_Parkistan/bsc-sdm-2010-hessenbox/distribution_merged_Pakistan/distribution_Pakistan_all_test.shp")
-lad <- readOGR("F:/Projekt_Parkistan/bsc-sdm-2010-hessenbox/Ladak_maps_final/distribution_Ladakh_all_test.shp")
+pak <- readOGR("E:/Uni/5. Semester/Pakistan_Projekt/bsc-sdm-2019/data/distribution/distribution_merged_Pakistan/distribution_Pakistan_all_test.shp")
+lad <- readOGR("E:/Uni/5. Semester/Pakistan_Projekt/Daten/ladakh_merged_shapes/distribution_Ladakh_all_merged.shp")
+
+pak <- spTransform(pak, crs(raster_50))
+lad <- spTransform(lad, crs(raster_50))
 
 pak_df <- as.data.frame(pak)
 lad_df <- as.data.frame(lad)
@@ -35,5 +38,5 @@ all <- merge(pak_df,lad_df, all.x = TRUE, all.y = FALSE)
 
 all$id <- NULL
 
-write.table(all, file = "F:/Projekt_Parkistan/bsc-sdm-2010-hessenbox/PakistanLadak.csv", quote = FALSE, row.names = FALSE, sep = ";")
+write.table(all, file = "E:/Uni/5. Semester/Pakistan_Projekt/bsc-sdm-2019/data/distribution/PakistanLadakh/PakistanLadak.csv", quote = FALSE, row.names = FALSE, sep = ";")
 
