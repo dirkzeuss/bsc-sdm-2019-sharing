@@ -1,0 +1,347 @@
+---
+title: "Gabriel's Bioclim"
+author: "William J. Gabriel"
+date: "11 2 2020"
+output: html_document
+---
+
+# **Distribution of Butterflies in Pakistan**
+
+
+![Alt-Text](F:/Project/Lycaena_aditya.jpg)
+
+
+
+##### First step is to load and attach add-on packages
+
+```{r}
+library("sp")
+
+library("raster")
+
+library("rgdal")
+
+library("dismo")
+```
+
+##### Clean workspace 
+
+```{r}
+rm(list=ls())
+```
+
+##### Set a working directory 
+
+```{r}
+wd <- "F:/Project/"
+
+setwd(wd)
+```
+
+##### Extent for computational region
+
+```{r}
+ext <- extent(c(58, 83, 23, 38))
+# in wgs 84, c(-4500000, 70000, -2500000, 3000000) in epsg 102025. 
+# Syntax: extent(length=4; order= xmin, xmax, ymin, ymax)
+
+
+```
+
+# **Read in and prepare the data**
+
+
+##### Grid
+
+```{r}
+raster_50 <- readOGR("F:/Project/Gitter/Gitter_50km.shp") 
+# CRS is EPSG 102025 (Albers equal area). This is the project crs.
+
+
+```
+
+##### Country boundaries
+
+```{r}
+pakistan <- getData("GADM", country="Pakistan", level=0)
+
+pakistan <- spTransform(pakistan, crs(raster_50))  
+# Transforms to EPSG 102025
+
+
+```
+
+##### Distribution data  
+
+```{r}
+all_files_in_distribution     <- list.files(path = "F:/Project/distribution_Pakistan/", recursive = T) 
+# List all files
+
+
+shp_paths                     <- grep(".shp$", all_files_in_distribution, value=TRUE) 
+# Select shapefiles
+
+
+```
+
+##### Read in multiple shapefiles as elements of a list
+
+```{r}
+number_of_species_to_process <- length(shp_paths) # All species
+
+
+
+shp_list <- list() 
+
+for(i in 1:number_of_species_to_process){ # Only number_of_testspecies for testing
+  
+  shp_list[[i]]                 <- readOGR(paste0("F:/Project/distribution_Pakistan/", shp_paths[i]))
+  
+  shp_list[[i]]                 <- spTransform(shp_list[[i]], crs(raster_50)) 
+  # Transforms to EPSG 102025
+  
+  shp_list[[i]]@data$species    <- gsub(".shp", "", basename(shp_paths[i]))
+  
+}
+```
+
+
+##### Prepare attribute tables of shapefiles as data.frames for modelling
+
+```{r}
+df_list <- list()
+
+for(i in 1:length(shp_list)){
+  
+  df_list[[i]]        <- as.data.frame(shp_list[[i]]) # transform to data.frame
+  
+  names(df_list[[i]]) <- gsub("coords.x1", "x", names(df_list[[i]])) # Adjust coordinate names
+  
+  names(df_list[[i]]) <- gsub("coords.x2", "y", names(df_list[[i]])) # Adjust coordinate names
+  
+}
+```
+
+##### Prepare environmental variables as predictors
+
+```{r}
+predictor_files <- list.files(path="F:/Project/worldclim/", full.names=TRUE ) 
+# Adjust file path to your personal working environment
+
+
+```
+
+##### Read in environmental data files and transform crs to project crs
+
+
+```{r}
+predictor_list <- list()
+
+for(i in 1:length(predictor_files)){
+  
+  cat(predictor_files[i], "\n")
+  
+  predictor_list[[i]] <- raster(predictor_files[i]) 
+  # Read in single file
+  
+  predictor_list[[i]] <- projectRaster(predictor_list[[i]], crs=crs(raster_50)) 
+  # Reproject to project crs
+  
+}
+```
+
+##### Transform list to RasterStack
+
+```{r}
+predictors <- stack(predictor_list) 
+predictors
+
+
+predictors <- dropLayer(predictors, 'biome') 
+# Remove this layer because it is not metric
+```
+
+
+# **Now we have everything we need for modelling:** 
+
+##### - A Grid system for counting species numbers in each cell later (raster_50), which also carries the project crs
+
+##### - Political boundaries of the study region for plotting and cropping of data (pakistan)
+
+##### - Distribution data of multiple species in data.frames within a list (df_list)
+
+##### - A RasterStack of predictor variables
+
+##### - Every spatial object in the same crs (epsg 102025)
+
+
+
+# **Checking if all layers make sense by visual inspection always is a good idea:**
+
+##### (be aware that the zoom function in RStudio can lead to strange non-overlapping results depending on the aspect ratio)
+
+```{r}
+plot(raster_50)
+
+plot(pakistan, add=TRUE)
+
+plot(predictors[[1]], add=TRUE)
+
+plot(shp_list[[1]], add=TRUE)
+```
+
+
+# *Modelling with Bioclim* ----------------------------------------------------------------------------------------------------------------------
+
+##### Workflow: First, only one species then many species in a loop.
+
+##### Objective is the creation of an area-wide presence/absence map.
+
+##### One species
+
+```{r}
+bioclim_model <- bioclim(predictors, df_list[[1]][c("x", "y")]) 
+
+prediction <- dismo::predict(object = bioclim_model, x = predictors)
+```
+
+##### Plot prediction
+
+```{r}
+plot(prediction)
+
+plot(pakistan, add=TRUE)
+
+points(df_list[[1]][c("x", "y")])
+```
+
+##### Thresholding 
+
+```{r}
+threshold_bioclim <- raster::quantile(prediction)[4]
+
+# This is crucial for the results. Here is one Suggestion which uses the third quantile as cut-off value
+```
+
+##### Use the threshold for binary presence/absence classification of the prediction
+
+##### Reclassification matrix for reclassify()
+
+```{r}
+
+classification_matrix <- matrix(c(0, threshold_bioclim, 0,
+                                  
+                                  threshold_bioclim, 1, 1),
+                                
+                                ncol=3, byrow = TRUE)
+```
+
+##### Reclassify
+
+```{r}
+result_presence_absence <- reclassify(prediction, rcl = classification_matrix)
+```
+
+##### Plot the distribution of presence and absence data 
+
+```{r}
+plot(result_presence_absence)
+```
+
+##### Now for many species:
+
+```{r}
+presence_absence_maps <- list()
+
+for(i in 1:length(df_list))try({
+  
+  cat(i, " ", df_list[[i]]$species[1], "\n")
+  
+  bioclim_model      <- bioclim(predictors, df_list[[i]][c("x", "y")])
+  
+  prediction         <- dismo::predict(object = bioclim_model, x = predictors)
+  
+  threshold_bioclim  <- raster::quantile(prediction)[4]
+  
+  classification_matrix <- matrix(c(0, threshold_bioclim, 0, threshold_bioclim, 1, 1),ncol=3, byrow = TRUE)
+  
+  result_presence_absence <- reclassify(prediction, rcl = classification_matrix)
+  
+  presence_absence_maps[[i]] <- result_presence_absence
+  
+  species_name <- df_list[[i]]$species[1]
+  
+  names(presence_absence_maps[[i]]) <- species_name # add species name to layer
+  
+  writeRaster(presence_absence_maps[[i]], filename = file.path(wd, "output/modelling/bioclim",  species_name), format="GTiff", overwrite=TRUE) # Write out each modeled species as GeoTiff
+  
+})
+```
+
+##### Remove empty (null) entries. In this case those with only one record, which failed to be modelled with bioclim().
+
+```{r}
+presence_absence_maps <- presence_absence_maps[!unlist(lapply(presence_absence_maps, is.null))]
+```
+
+##### Create RasterStack from list
+
+```{r}
+presence_absence_stack <- stack(presence_absence_maps) # transform list to RasterStack
+```
+
+##### Sum over all RasterStack layers to create the final species richness map
+
+```{r}
+richness_map <- stackApply(presence_absence_stack, indices=rep(1,nlayers(presence_absence_stack)), fun = sum, na.rm = TRUE)
+```
+
+##### Plot richness_map
+
+```{r}
+plot(richness_map)
+
+plot(pakistan, add=TRUE)
+```
+
+
+
+
+# **Write out** ----------------------------------------------------------------------------------------------------------------------
+
+##### GeoTiff
+
+```{r}
+writeRaster(richness_map, filename = file.path(wd, "bioclim", "richness_map_bioclim"), format="GTiff", overwrite=TRUE)
+```
+
+##### JPG
+
+```{r}
+jpeg(filename = file.path(wd, "bioclim", "richness_map_bioclim.jpg"), width = 2000, height = 2000, quality = 99)
+
+plot(richness_map)
+
+plot(pakistan, add=TRUE)
+
+dev.off()
+```
+
+##### PDF
+
+```{r}
+pdf(file.path(wd, "bioclim", "richness_map_bioclim.pdf"), width = 10, height = 10)
+
+plot(richness_map)
+
+plot(pakistan, add=TRUE)
+
+dev.off()
+```
+
+##### References
+
+Guisan, A., & Zimmermann, N. E. (2000). Predictive habitat distribution models in ecology. Ecological modelling, 135(2-3), 147-186.
+Hao, T., Elith, J., Guillera‐Arroita, G., & Lahoz‐Monfort, J. J. (2019). A review of evidence about use and performance of species distribution modelling ensembles like BIOMOD. Diversity and Distributions, 25(5), 839-852.
+Beaumont, L. J., Hughes, L., & Poulsen, M. (2005). Predicting species distributions: use of climatic parameters in BIOCLIM and its impact on predictions of species’ current and future distributions. Ecological modelling, 186(2), 251-270.
+
