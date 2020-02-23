@@ -1,21 +1,19 @@
 ###  GIS Projekt Tagfalter Pakistan
-##   Methode: Bioclim
-##   Dirk Zeuss 
-#    29.1.2020
-
-# This is just a rough template and MUST be adjusted!
+##   Methode: Random Forest
+##   Mandy Gimpel nach Vorlage von Dirk Zeuss 
+#    12.02.2020
 
 #### Praeambel  ----------------------------------------------------------------------------------------------
 library("raster")
 library("rgdal")
 library("dismo")
-
+library("randomForest")
 
 # Clean workspace
 rm(list=ls())
 
 # Set working directory
-wd <- "~/Schreibtisch/Projekt_Pakistan/GIS"
+wd <- "D:.../Random_Forest/"
 setwd(wd)
 
 # Extent for computational region
@@ -25,39 +23,14 @@ ext <- extent(c(58, 83, 23, 38)) # in wgs 84, c(-4500000, 70000, -2500000, 30000
 #### Read in and prepare data  ----------------------------------------------------------------------------------------------
 
 # Grid
-raster_50 <- readOGR("data/shape/Gitter/Gitter_50km.shp") # Read in grid. CRS is EPSG 102025 (Albers equal area). This is the project crs.
+raster_50 <- readOGR("Gitter/Gitter_50km.shp") # Read in grid. CRS is EPSG 102025 (Albers equal area). This is the project crs.
 
 # Country boundaries
 pakistan <- getData("GADM", country="Pakistan", level=0)
 pakistan <- spTransform(pakistan, crs(raster_50)) # Transforms to EPSG 102025
 
-# Distribution data  
-all_files_in_distribution     <- list.files(path = "../data/distribution/Pakistan/", recursive = T) # List all files
-shp_paths                     <- grep(".shp$", all_files_in_distribution, value=TRUE) # Select shapefiles
-
-# Read in multiple shapefiles as elements of a list
-# number_of_species_to_process <- 5 
-number_of_species_to_process <- length(shp_paths) # All species
-
-shp_list <- list() 
-  for(i in 1:number_of_species_to_process){ # Only number_of_testspecies for testing
-     shp_list[[i]]                 <- readOGR(paste0("../data/distribution/Pakistan/", shp_paths[i]))
-     shp_list[[i]]                 <- spTransform(shp_list[[i]], crs(raster_50)) # Transforms to EPSG 102025
-     shp_list[[i]]@data$species    <- gsub(".shp", "", basename(shp_paths[i]))
-}
-
-
-## Prepare attribute tables of shapefiles as data.frames for modelling
-df_list <- list()
-for(i in 1:length(shp_list)){
-  df_list[[i]]        <- as.data.frame(shp_list[[i]]) # transform to data.frame
-  names(df_list[[i]]) <- gsub("coords.x1", "x", names(df_list[[i]])) # Adjust coordinate names
-  names(df_list[[i]]) <- gsub("coords.x2", "y", names(df_list[[i]])) # Adjust coordinate names
-}
-
-
 ## Prepare environmental variables as predictors
-predictor_files <- list.files(path="data/raster/Worldclim/worldclim/", full.names=TRUE ) # Adjust file path to your personal working environment!
+predictor_files <- list.files(path="Predictors/", full.names=TRUE ) # Adjust file path to your personal working environment!
 
 # Add more data here for better predictions!!!
 
@@ -71,117 +44,159 @@ for(i in 1:length(predictor_files)){
 
 predictors <- stack(predictor_list) # Transform list to RasterStack
 
-predictors <- dropLayer(predictors, 'biome') # Remove this layer because it is not metric
+butterflies_csv <- read.csv("PakistanLadakh points/PakistanLadak_points.csv", header=TRUE, sep=';') # read in points of butterflies
+
+butterflies_csv_longlat <- SpatialPointsDataFrame(butterflies_csv[,c("x", "y")], 
+                                                 butterflies_csv,
+                                                 proj4string = crs(raster(predictor_files[1]))) #transform csv list into spatial points data frame
+
+butterflies_csv_albers <- spTransform(butterflies_csv_longlat, crs(raster_50)) # transform crs so every spatial object is in the same crs (epsg 102025) 
+
+butterflies_csv_albers <- as.data.frame(butterflies_csv_albers) # set as data frame
+
+split_species <- split(butterflies_csv_albers , f = butterflies_csv_albers$species) # grouping data by species
 
 ## Now we have everything we need for modelling: 
 # - A Grid system for counting species numbers in each cell later (raster_50), which also carries the project crs
 # - Political boundaries of the study region for plotting and cropping of data (pakistan)
-# - Distribution data of multiple species in data.frames within a list (df_list)
 # - A RasterStack of predictor variables
+# - Distribution data of multiple species in data.frames within a list (df_list)
 # - Every spatial object in the same crs (epsg 102025)
 
 # Checking if all layers make sense by visual inspection always is a good idea:
 # (be aware that the zoom function in RStudio can lead to strange non-overlapping results depending on the aspect ratio)
 
 plot(raster_50)
-plot(pakistan, add=TRUE)
 plot(predictors[[1]], add=TRUE)
-plot(shp_list[[4]], add=TRUE)
+plot(pakistan, add=TRUE)
 
 
-### Modelling ----------------------------------------------------------------------------------------------------------------------
-# Workflow: First, only one species then many species in a loop.
+#### Modelling ----------------------------------------------------------------------------------------------------------------------
+# Workflow: First, only a few test-species then all species in a loop
 # Objective is the creation of an area-wide presence/absence map.
 
-## One species: ---
-bioclim_model <- bioclim(predictors, df_list[[3]][c("x", "y")]) # Number 3 is just one example species
-prediction <- dismo::predict(object = bioclim_model, x = predictors)
 
-# Reality check
-plot(prediction)
-plot(pakistan, add=TRUE)
-points(df_list[[3]][c("x", "y")])
+# Loop first three species to test the loop
+result <- list()
+for(i in 1:3)try({
+  cat(i, " ", as.character(split_species[[i]]$species[1]), "\n") # show i
+  species <- split_species[[i]] #write one species in species
+  
+  #1 generating presence points
+  presence_values <- extract(predictors, species[,c("x.1", "y.1")]) # Extracting presence values from rasters
+  
+  #2 generating absence points
+  set.seed(123)
+  absence_points <- randomPoints(predictors, nrow(species)) # creating random absence-points equal to number of presence points
+  absence_values <- extract(predictors, absence_points) # Extracting absence values from rasters
+  
+  #3 putting pb and climate data into a single dataframe and set column 'pb' as factor, otherwise it'll do Regression
+  pb <- c(rep(1, nrow(presence_values)), rep(0, nrow(absence_values))) 
+  sdmdata <- data.frame(cbind(pb, rbind(presence_values, absence_values)))
+  sdmdata[,'pb'] = as.factor(sdmdata[,'pb'])
 
-# Thresholding. This is crucial for the results. Here is one SUGGESTION which uses the third quantile as cut-off value
-threshold_bioclim <- raster::quantile(prediction)[4]
+  #4 generating Random Forest
+  set.seed(123) 
+  myForest<- randomForest(pb ~., data=sdmdata, importance=TRUE, mtry=3, ntree=300, replace=TRUE, do.trace=TRUE, keep.forest=TRUE, na.action=na.roughfix)
+  myForest
+  
+  #5 output
+  species_name <- as.character(species$species[1])
+  prediction <- predict(predictors, myForest)
 
-## Use the threshold for binary presence/absence classification of the prediction
-# Reclassification matrix for reclassify(). see ?raster::reclassify. Needs to have three columns. One row for each class: 1,10,999 becomes class 999 for values between 1 and 10, etc.
-classification_matrix <- matrix(c(0, threshold_bioclim, 0,
-                                  threshold_bioclim, 1, 1),
-                                ncol=3, byrow = TRUE)
+  result[[i]] <- prediction
 
-# Reclassify
-result_presence_absence <- reclassify(prediction, rcl = classification_matrix)
-
-plot(result_presence_absence)
-
-
-## Now for many species: ---
-
-presence_absence_maps <- list()
-for(i in 1:length(df_list))try({
-  cat(i, " ", df_list[[i]]$species[1], "\n")
-  bioclim_model      <- bioclim(predictors, df_list[[i]][c("x", "y")])
-  prediction         <- dismo::predict(object = bioclim_model, x = predictors)
-  threshold_bioclim  <- raster::quantile(prediction)[4]
-  classification_matrix <- matrix(c(0, threshold_bioclim, 0, threshold_bioclim, 1, 1),ncol=3, byrow = TRUE)
-  result_presence_absence <- reclassify(prediction, rcl = classification_matrix)
-  presence_absence_maps[[i]] <- result_presence_absence
-  species_name <- df_list[[i]]$species[1]
-  names(presence_absence_maps[[i]]) <- species_name # add species name to layer
-  # Write out each modeled species as GeoTiff
-  # If you don net yet have the directory, create it with e.g. dir.create(file.path(wd, "output/modelling/bioclim"), recursive=TRUE)
-  writeRaster(presence_absence_maps[[i]], filename = file.path(wd, "output/modelling/bioclim", species_name), format="GTiff")
+  #6 writing maps for every species
+  writeRaster(prediction, filename = file.path(wd, "Output/Single_Species/", species_name), format="GTiff")
 })
 
+# creating a Richness Map with Test-Species Data
+richness_files <- list.files(path="Output/Single_Species/", full.names=TRUE ) # Adjust file path to your personal working environment!
+richness_list <- list()
 
-# Remove empty (null) entries. In this case those with only one record, which failed to be modelled with bioclim().
-presence_absence_maps <- presence_absence_maps[!unlist(lapply(presence_absence_maps, is.null))] 
+for(i in 1:length(richness_files)){
+  cat(richness_files[i], "\n")
+  richness_list[[i]] <- raster(richness_files[i]) # Read in single file
+}  
 
 # Create RasterStack from list
-presence_absence_stack <- stack(presence_absence_maps) # transform list to RasterStack
-
+richness_stack <- stack(richness_list) # Transform list to RasterStack  
+  
 # Sum over all RasterStack layers to create the final species richness map
-richness_map <- stackApply(presence_absence_stack, indices=rep(1, nlayers(presence_absence_stack)), fun = sum, na.rm = TRUE)
+richness_map <- stackApply(richness_stack, indices=rep(1, nlayers(richness_stack)), fun = sum, na.rm = TRUE)
 
 # Plot result
 plot(richness_map)
 plot(pakistan, add=TRUE)
 
+# Output GeoTiff
+writeRaster(richness_map, filename = file.path(wd, "Output/Richness_Map/", "richness_map_random_forest"), format="GTiff")
 
-## Write out ----------------------------------------------------------------------------------------------------------------------
 
-# GeoTiff
-writeRaster(richness_map, filename = file.path(wd, "output/modelling", "richness_map_bioclim"), format="GTiff")
+# Loop for all Species
+result <- list()
+for(i in 1:length(split_species))try({
+  cat(i, " ", as.character(split_species[[i]]$species[1]), "\n") # show i
+  species <- split_species[[i]] #write one species in species
+  
+  #1 generating presence points
+  presence_values <- extract(predictors, species[,c("x.1", "y.1")]) # Extracting presence values from rasters
+  
+  #2 generating absence points
+  set.seed(123)
+  absence_points <- randomPoints(predictors, nrow(species)) # creating random absence-points equal to number of presence points
+  absence_values <- extract(predictors, absence_points) # Extracting absence values from rasters
+  
+  #3 putting pb and climate data into a single dataframe and set column 'pb' as factor, otherwise it'll do Regression
+  pb <- c(rep(1, nrow(presence_values)), rep(0, nrow(absence_values))) 
+  sdmdata <- data.frame(cbind(pb, rbind(presence_values, absence_values)))
+  sdmdata[,'pb'] = as.factor(sdmdata[,'pb'])
+  
+  #4 generating Random Forest
+  set.seed(123) 
+  myForest<- randomForest(pb ~., data=sdmdata, importance=TRUE, mtry=3, ntree=300, replace=TRUE, do.trace=TRUE, keep.forest=TRUE, na.action=na.roughfix)
+  myForest
 
-# JPG
-jpeg(filename = file.path(wd, "output/modelling", "richness_map_bioclim.jpg"), width = 2000, height = 2000, quality = 99)
+  #5 output
+  species_name <- as.character(species$species[1])
+  prediction <- predict(predictors, myForest)
+
+  result[[i]] <- prediction
+  
+  # writing maps for every species
+  writeRaster(prediction, filename = file.path(wd, "Output/Single_Species/", species_name), format="GTiff")
+})
+
+# creating a Richness Map with all species Data
+richness_files <- list.files(path="Output/Single_Species/", full.names=TRUE ) # Adjust file path to your personal working environment!
+richness_list <- list()
+
+for(i in 1:length(richness_files)){
+  cat(richness_files[i], "\n")
+  richness_list[[i]] <- raster(richness_files[i]) # Read in single file
+}  
+
+# Create RasterStack from list
+richness_stack <- stack(richness_list) # Transform list to RasterStack  
+
+
+# Sum over all RasterStack layers to create the final species richness map
+
+# caution: it may take a while. On my pc it took between 18 and 24 hours to calculate the sum with the whole stack of 400+ files.
+# Meanwhile I took another turn and split the file-stack into smaller parts to process them faster. 
+# Processing only 100 files at a time and summing them up afterwards was much faster. With this method it took only 1.5 hours to process all 400+ files.
+# But if you take this method remember to edit the value 1 (which is the value to be summed) to !0 (not zero), 
+# because the value 1 is no longer present due to the previous step of summing up.
+
+richness_map <- stackApply(richness_stack, indices=rep(1, nlayers(richness_stack)), fun = sum, na.rm = TRUE) # with all 400+ files
+#richness_map <- stackApply(richness_stack, indices=rep(!0, nlayers(richness_stack)), fun = sum, na.rm = TRUE) # with intermediate steps
+
+# Plot result
 plot(richness_map)
 plot(pakistan, add=TRUE)
-dev.off()
 
-# PDF
-pdf(file.path(wd, "output/modelling", "richness_map_bioclim.pdf"), width = 10, height = 10)
-plot(richness_map)
-plot(pakistan, add=TRUE)
-dev.off()
-
-
-
-## Chunks   ----------------------------------------------------------------------------------------------------------------------
-
-# For other methods which require VALUES of environmental data at presence locations, 
-# or VALUES of environmental data at pseudo absence locations, the following chuncks may be useful:
-
-# Extract environmental information at PRESENCE locations of a/multiple species
-# presence_values <- extract(predictors, df_list[[3]][c("x", "y")])
-
-# Set random background points for extracting environmental information of pseudo absences (we do not have real absence values)
-# background_points <- randomPoints(predictors, nrow(df_list[[3]])) # the amount of background points in this example is equal to the number of presence points
-
-# Extract environmental information at ABSENCE locations of a/multiple species
-# absence_values <- extract(predictors, background_points)
+# Output GeoTiff
+writeRaster(richness_map, filename = file.path(wd, "Output/Richness_Map/", "richness_map_random_forest"), format="GTiff")
 
 
 
