@@ -9,69 +9,86 @@
 library("raster")
 library("rgdal")
 library("dismo")
+library("e1071")
 
 
 # Clean workspace
 rm(list=ls())
 
 # Set working directory
-wd <- "~/Schreibtisch/Projekt_Pakistan/GIS"
+wd <- "T:/Projekt_Pakistan/bsc-sdm-2010-hessenbox"
 setwd(wd)
 
+
 # Extent for computational region
-ext <- extent(c(58, 83, 23, 38)) # in wgs 84, c(-4500000, 70000, -2500000, 3000000) in epsg 102025. Syntax: extent(length=4; order= xmin, xmax, ymin, ymax). 
+ext <- extent(c(-4500000, 70000, -2500000, 3000000)) #in epsg 102025. Syntax: extent(length=4; order= xmin, xmax, ymin, ymax). 
 
 
 #### Read in and prepare data  ----------------------------------------------------------------------------------------------
 
 # Grid
-raster_50 <- readOGR("data/shape/Gitter/Gitter_50km.shp") # Read in grid. CRS is EPSG 102025 (Albers equal area). This is the project crs.
+raster_25 <- readOGR("T:/Projekt_Pakistan/bsc-sdm-2010-hessenbox/Gitter/Gitter_25km.shp") # Read in grid. CRS is EPSG 102025 (Albers equal area). This is the project crs.
 
 # Country boundaries
 pakistan <- getData("GADM", country="Pakistan", level=0)
-pakistan <- spTransform(pakistan, crs(raster_50)) # Transforms to EPSG 102025
+pakistan <- spTransform(pakistan, crs(raster_25)) # Transforms to EPSG 102025
 
 # Distribution data  
-all_files_in_distribution     <- list.files(path = "../data/distribution/Pakistan/", recursive = T) # List all files
-shp_paths                     <- grep(".shp$", all_files_in_distribution, value=TRUE) # Select shapefiles
+#all_files_in_distribution     <- list.files(path = "../data/distribution/Pakistan/", recursive = T) # List all files
+#shp_paths                     <- grep(".shp$", all_files_in_distribution, value=TRUE) # Select shapefiles
 
 # Read in multiple shapefiles as elements of a list
 # number_of_species_to_process <- 5 
-number_of_species_to_process <- length(shp_paths) # All species
+# number_of_species_to_process <- length(shp_paths) # All species
 
-shp_list <- list() 
-  for(i in 1:number_of_species_to_process){ # Only number_of_testspecies for testing
-     shp_list[[i]]                 <- readOGR(paste0("../data/distribution/Pakistan/", shp_paths[i]))
-     shp_list[[i]]                 <- spTransform(shp_list[[i]], crs(raster_50)) # Transforms to EPSG 102025
-     shp_list[[i]]@data$species    <- gsub(".shp", "", basename(shp_paths[i]))
-}
+#shp_list <- list() 
+#  for(i in 1:number_of_species_to_process){ # Only number_of_testspecies for testing
+#     shp_list[[i]]                 <- readOGR(paste0("../data/distribution/Pakistan/", shp_paths[i]))
+#     shp_list[[i]]                 <- spTransform(shp_list[[i]], crs(raster_50)) # Transforms to EPSG 102025
+#     shp_list[[i]]@data$species    <- gsub(".shp", "", basename(shp_paths[i]))
+#}
+  
+#Import & project point data set of butterflies
+all_spec<- read.csv("T:/Projekt_Pakistan/bsc-sdm-2010-hessenbox/PakistanLadak2.csv", sep = ",")
+
+coordinates(all_spec) <- ~ coords.x1 + coords.x2
+
+crs(all_spec) <- "+proj=longlat +datum=WGS84 +no_defs"
+
+all_spec <- spTransform(all_spec, CRS("+init=epsg:4326"))
+
+all_spec <- spTransform(all_spec, crs(raster_25))
+
+spec_list <- split(all_spec, all_spec$species) #create list from all_spec.csv
 
 
 ## Prepare attribute tables of shapefiles as data.frames for modelling
+
 df_list <- list()
-for(i in 1:length(shp_list)){
-  df_list[[i]]        <- as.data.frame(shp_list[[i]]) # transform to data.frame
+for(i in 1:length(spec_list)){
+  df_list[[i]]        <- as.data.frame(spec_list[[i]]) # transform to data.frame
   names(df_list[[i]]) <- gsub("coords.x1", "x", names(df_list[[i]])) # Adjust coordinate names
   names(df_list[[i]]) <- gsub("coords.x2", "y", names(df_list[[i]])) # Adjust coordinate names
 }
 
-
 ## Prepare environmental variables as predictors
-predictor_files <- list.files(path="data/raster/Worldclim/worldclim/", full.names=TRUE ) # Adjust file path to your personal working environment!
+predictor_files <- list.files(path="T:/Projekt_Pakistan/bsc-sdm-2010-hessenbox/worldclim", full.names=TRUE) # Adjust file path to your personal working environment!
 
 # Add more data here for better predictions!!!
 
 # Read in environmental data files and transform crs to project crs
 predictor_list <- list()
 for(i in 1:length(predictor_files)){
-  cat(predictor_files[i], "\n")
-  predictor_list[[i]] <- raster(predictor_files[i]) # Read in single file
-  predictor_list[[i]] <- projectRaster(predictor_list[[i]], crs=crs(raster_50)) # Reproject to project crs
+ cat(predictor_files[i], "\n")
+ predictor_list[[i]] <- raster(predictor_files[i]) # Read in single file
+ predictor_list[[i]] <- projectRaster(predictor_list[[i]], crs=crs(raster_25)) # Reproject to project crs
 }
 
 predictors <- stack(predictor_list) # Transform list to RasterStack
 
 predictors <- dropLayer(predictors, 'biome') # Remove this layer because it is not metric
+
+
 
 ## Now we have everything we need for modelling: 
 # - A Grid system for counting species numbers in each cell later (raster_50), which also carries the project crs
@@ -83,61 +100,61 @@ predictors <- dropLayer(predictors, 'biome') # Remove this layer because it is n
 # Checking if all layers make sense by visual inspection always is a good idea:
 # (be aware that the zoom function in RStudio can lead to strange non-overlapping results depending on the aspect ratio)
 
-plot(raster_50)
-plot(pakistan, add=TRUE)
+plot(raster_25)
+plot(pakistan)
 plot(predictors[[1]], add=TRUE)
-plot(shp_list[[4]], add=TRUE)
-
+plot(all_spec, add=TRUE)
 
 ### Modelling ----------------------------------------------------------------------------------------------------------------------
 # Workflow: First, only one species then many species in a loop.
 # Objective is the creation of an area-wide presence/absence map.
 
 ## One species: ---
-bioclim_model <- bioclim(predictors, df_list[[3]][c("x", "y")]) # Number 3 is just one example species
-prediction <- dismo::predict(object = bioclim_model, x = predictors)
+library("sdm")
+library("usdm")
 
-# Reality check
-plot(prediction)
-plot(pakistan, add=TRUE)
-points(df_list[[3]][c("x", "y")])
+# Remove Species with <2 records
+df_list[[89]] <- NULL 
+df_list[[181]] <- NULL
+df_list[[267]] <- NULL #Paralasa_afghana
+df_list[[273]] <- NULL #Parantica_sita
+df_list[[273]] <- NULL #Pareronia_anais
+df_list[[280]] <- NULL #Parnassius_elegans
+df_list[[282]] <- NULL #Parnassius_inopinatus
+df_list[[311]] <- NULL #Plebejus_leela
+df_list[[338]] <- NULL #Polyommatus_venus
+df_list[[350]] <- NULL #Pseudochazara_annieae
+df_list[[356]] <- NULL #Pyrgus_badachschanus
+df_list[[368]] <- NULL #Seseria_dohertyi
+df_list[[378]] <- NULL #Spindasis_schistacea
+df_list[[398]] <- NULL #Turanana_kotzschiorum
+df_list[[400]] <- NULL #Vagrans_egista
+df_list[[270]] <- NULL #Paralasa_kotzschae
+df_list[[282]] <- NULL #Parnassius_loxias
+df_list[[397]] <- NULL #Udara_dilecta
 
-# Thresholding. This is crucial for the results. Here is one SUGGESTION which uses the third quantile as cut-off value
-threshold_bioclim <- raster::quantile(prediction)[4]
+# Create GTiff
 
-## Use the threshold for binary presence/absence classification of the prediction
-# Reclassification matrix for reclassify(). see ?raster::reclassify. Needs to have three columns. One row for each class: 1,10,999 becomes class 999 for values between 1 and 10, etc.
-classification_matrix <- matrix(c(0, threshold_bioclim, 0,
-                                  threshold_bioclim, 1, 1),
-                                ncol=3, byrow = TRUE)
-
-# Reclassify
-result_presence_absence <- reclassify(prediction, rcl = classification_matrix)
-
-plot(result_presence_absence)
-
-
-## Now for many species: ---
-
-presence_absence_maps <- list()
-for(i in 1:length(df_list))try({
+result <- list()
+for (i in 353:length(df_list))({
   cat(i, " ", df_list[[i]]$species[1], "\n")
-  bioclim_model      <- bioclim(predictors, df_list[[i]][c("x", "y")])
-  prediction         <- dismo::predict(object = bioclim_model, x = predictors)
-  threshold_bioclim  <- raster::quantile(prediction)[4]
-  classification_matrix <- matrix(c(0, threshold_bioclim, 0, threshold_bioclim, 1, 1),ncol=3, byrow = TRUE)
-  result_presence_absence <- reclassify(prediction, rcl = classification_matrix)
-  presence_absence_maps[[i]] <- result_presence_absence
-  species_name <- df_list[[i]]$species[1]
-  names(presence_absence_maps[[i]]) <- species_name # add species name to layer
-  # Write out each modeled species as GeoTiff
-  # If you don net yet have the directory, create it with e.g. dir.create(file.path(wd, "output/modelling/bioclim"), recursive=TRUE)
-  writeRaster(presence_absence_maps[[i]], filename = file.path(wd, "output/modelling/bioclim", species_name), format="GTiff")
+  a <- df_list[[150]][c("x", "y")]
+  a$presence <- 1
+  coordinates(a) <- ~x+y
+  svm_model <- sdmData(presence ~., a, predictors = predictors, bg = list(n=1000))
+  svm_model <- sdm(presence~., svm_model, methods=c('svm'))
+  svm_model <- predict(svm_model, predictors)
+  threshold_svm <- raster::quantile(svm_model)[4]
+  classification_matrix <- matrix(c(0, threshold_svm, 0, threshold_svm, 1, 1),ncol=3, byrow = TRUE)
+  result_presence_absence <- reclassify(svm_model, rcl = classification_matrix)
+  result[[i]] <- result_presence_absence
+  species_name <- df_list[[i]]$species[1] # add species name to layer
+  writeRaster(result[[i]], filename = file.path(wd, "GIS/output/modelling/svm", species_name), format="GTiff", overwrite = TRUE)
 })
 
 
 # Remove empty (null) entries. In this case those with only one record, which failed to be modelled with bioclim().
-presence_absence_maps <- presence_absence_maps[!unlist(lapply(presence_absence_maps, is.null))] 
+presence_absence_maps <- result[!unlist(lapply(result, is.null))] 
 
 # Create RasterStack from list
 presence_absence_stack <- stack(presence_absence_maps) # transform list to RasterStack
@@ -153,16 +170,16 @@ plot(pakistan, add=TRUE)
 ## Write out ----------------------------------------------------------------------------------------------------------------------
 
 # GeoTiff
-writeRaster(richness_map, filename = file.path(wd, "output/modelling", "richness_map_bioclim"), format="GTiff")
+writeRaster(richness_map, filename = file.path(wd, "GIS/output/modelling", "richness_map_svm"), format="GTiff", overwrite = TRUE)
 
 # JPG
-jpeg(filename = file.path(wd, "output/modelling", "richness_map_bioclim.jpg"), width = 2000, height = 2000, quality = 99)
+jpeg(filename = file.path(wd, "GIS/output/modelling", "richness_map_svm.jpg"), width = 2000, height = 2000, quality = 99)
 plot(richness_map)
 plot(pakistan, add=TRUE)
 dev.off()
 
 # PDF
-pdf(file.path(wd, "output/modelling", "richness_map_bioclim.pdf"), width = 10, height = 10)
+pdf(file.path(wd, "GIS/output/modelling", "richness_map_svm.pdf"), width = 10, height = 10)
 plot(richness_map)
 plot(pakistan, add=TRUE)
 dev.off()
